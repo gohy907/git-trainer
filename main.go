@@ -13,9 +13,11 @@ type choice struct {
 }
 
 type model struct {
-    choices  []choice
-	choosed  int
-    cursor   int
+    choices  			[]choice
+    cursor   			int
+
+	confirmMenuOpen 	bool
+	confirmMenuCursor 	int
 }
 
 func initialModel() model {
@@ -39,19 +41,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         switch msg.String() {
         case "ctrl+c", "q":
             return m, tea.Quit
-        case "up", "k":
-            if m.cursor > 0 {
+        case "up", "k": 
+            if !m.confirmMenuOpen && m.cursor > 0 {
                 m.cursor--
             }
         case "down", "j":
-            if m.cursor < len(m.choices)-1 {
+            if !m.confirmMenuOpen && m.cursor < len(m.choices)-1 {
                 m.cursor++
             }
 		case "enter":
-			if m.choosed == m.cursor{
-				m.choosed = -1 
+			if m.confirmMenuOpen {
+				if m.confirmMenuCursor == 1 {
+					m.confirmMenuOpen = false
+				}
 			} else {
-				m.choosed = m.cursor
+				m.confirmMenuOpen = true
+			}
+		case "left", "h":
+			if m.confirmMenuCursor > 0 {
+				m.confirmMenuCursor--
+			}
+		case "right", "l":
+			if m.confirmMenuCursor < 1 {
+				m.confirmMenuCursor++
 			}
 		}
     }
@@ -59,22 +71,40 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-    s := "What should we buy at the market?\n\n"
-    for i, choice := range m.choices {
-        cursor := " "
-        if m.cursor == i {
-            cursor = ">"
+	var s string
+	if m.confirmMenuOpen {
+		choice := m.choices[m.cursor]
+		s += "Подтвердите выбор\n\n"
+		s += fmt.Sprintf("%s %s\n", ">", choice.title)
+		for _, desc := range choice.description {
+            s += fmt.Sprintf("    %s\n", desc)
         }
-        s += fmt.Sprintf("%s %s\n", cursor, choice.title)
-        if m.cursor == i {
-            for _, desc := range choice.description {
-                s += fmt.Sprintf("    %s\n", desc)
-            }
-			if (m.cursor == m.choosed){
-				s += fmt.Sprintf("aboba?")
+		yes := " да "
+		no := " нет "
+		
+		if m.confirmMenuCursor == 0 {
+			yes = "[да]"
+		} else {
+			no = "[нет]"
+		}
+
+		s += fmt.Sprintf("\n   %s %s\n", yes, no)
+
+	} else {
+		s += "Выберите сценарий\n\n"
+		for i, choice := range m.choices {
+			cursor := " "
+			if m.cursor == i {
+				cursor = ">"
 			}
-        }
-    }
+			s += fmt.Sprintf("%s %s\n", cursor, choice.title)
+			if m.cursor == i {
+				for _, desc := range choice.description {
+					s += fmt.Sprintf("    %s\n", desc)
+				}
+			}
+		}
+	}
     s += "\nPress q to quit.\n"
     return s
 }
