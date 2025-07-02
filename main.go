@@ -26,7 +26,7 @@ func initialModel() model {
             {"Сценарий 1", []string{"Lorem ipsum dolor sit amet, consectetur adipiscing elit.", "Donec finibus, tortor nec commodo iaculis, metus."}},
             {"Сценарий 2", []string{"Lorem ipsum dolor sit amet, consectetur adipiscing elit.", "Ut efficitur, purus ut venenatis viverra, leo."}},
             {"Сценарий 3", []string{"Lorem ipsum dolor sit amet, consectetur adipiscing elit.", "Sed cursus efficitur viverra. Proin eget fringilla."}},
-            {"Сценарий 4", []string{"Aboba"}},
+            {"Сценарий 4", []string{"Lorem ipsum dolor sit aboba"}},
         },
     }
 }
@@ -88,7 +88,7 @@ func (m model) View() string {
 			no = "[нет]"
 		}
 
-		s += fmt.Sprintf("\n   %s %s\n", yes, no)
+		s += fmt.Sprintf("\n   %s %s\n\n", yes, no)
 
 	} else {
 		s += "Выберите сценарий\n\n"
@@ -99,13 +99,19 @@ func (m model) View() string {
 			}
 			s += fmt.Sprintf("%s %s\n", cursor, choice.title)
 			if m.cursor == i {
-				for _, desc := range choice.description {
-					s += fmt.Sprintf("    %s\n", desc)
+			for _, desc := range choice.description {
+				s += fmt.Sprintf("    %s\n", desc)
 				}
 			}
 		}
+		s += "\n"
 	}
-    s += "\nPress q to quit.\n"
+
+	if m.confirmMenuOpen {
+		s += "Нажмите ← или → для навигации, Enter для выбора, q для выхода"
+	} else {
+		s += "Нажмите ← ↓ ↑ → для навигации, Enter для выбора, q для выхода"
+	}
     return s
 }
 
