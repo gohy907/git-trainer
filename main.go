@@ -56,9 +56,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.confirmMenuOpen {
 
 				if m.confirmMenuCursor == 0 {
-					if m.cursor == 1 {
-						enterContainer()
-					}
+					enterTask(m.cursor)
 				}
 
 				m.confirmMenuOpen = false
@@ -134,10 +132,16 @@ func runCmdCommand(command string) error {
 	return cmd.Run()
 }
 
-func enterContainer() {
+func enterContainer1() {
 	runCmdCommand("clear")
-	runCmdCommand("../task1-container/run.sh")
+	runCmdCommand("tasks/task1-container/run.sh")
 	runCmdCommand("clear")
+}
+
+func enterTask(taskNumber int) {
+	if taskNumber == 1 {
+		enterContainer1()
+	}
 }
 
 func main() {
