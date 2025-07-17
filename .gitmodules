@@ -1,3 +1,0 @@
-[submodule "tasks/task1-container"]
-	path = tasks/task1-container
-	url = git@github.com:git-trainer-tasks/task1-container
