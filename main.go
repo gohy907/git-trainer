@@ -5,6 +5,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"os"
 	"os/exec"
+	"strconv"
 )
 
 type choice struct {
@@ -124,24 +125,30 @@ func (m model) View() string {
 	return s
 }
 
-func runCmdCommand(command string) error {
-	cmd := exec.Command(command)
+type Cmd struct {
+	name string
+	args []string
+}
+
+func newCmd(name string, args ...string) Cmd {
+	return Cmd{name: name, args: args}
+}
+
+func runCmd(command Cmd) error {
+	cmd := exec.Command(command.name, command.args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
-func enterContainer1() {
-	runCmdCommand("clear")
-	runCmdCommand("tasks/task1-container/run.sh")
-	runCmdCommand("clear")
-}
-
 func enterTask(taskNumber int) {
-	if taskNumber == 1 {
-		enterContainer1()
-	}
+	clear := newCmd("clear")
+	run := newCmd("./run.sh", strconv.Itoa(taskNumber))
+	runCmd(clear)
+	runCmd(run)
+	runCmd(clear)
+
 }
 
 func main() {
