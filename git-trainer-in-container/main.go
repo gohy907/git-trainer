@@ -39,8 +39,15 @@ var binPath, _ = os.Executable()
 var descFilePath = filepath.Join(filepath.Dir(binPath), "description.json")
 var InfoAboutTask Information = parseJsonAsInformation(descFilePath)
 
+type choiceType int
+
+const (
+	checkForCompletion choiceType = iota
+	restartTask
+)
+
 type model struct {
-	choices []choice
+	choices map[choiceType]choice
 	cursor  int
 
 	confirmMenuOpen   bool
@@ -54,9 +61,18 @@ func initialModel() model {
 		informations: []Information{
 			{"Описание задания:", InfoAboutTask.Description},
 		},
-		choices: []choice{
-			{"Проверить выполнение", []string{"Проверить, выполнены ли цели задания"}, false},
-			{"Перезагрузить задание", []string{"Начать задание с нуля, поможет, если Вы застряли"}, true},
+		choices: map[choiceType]choice{
+			checkForCompletion: {
+				title:            "Описание задания:",
+				description:      []string{"Проверить, выполнены ли цели задания"},
+				needConfifmation: false,
+			},
+
+			restartTask: {
+				title:            "Перезагрузить задание:",
+				description:      []string{"Начать задание с нуля, поможет, если Вы застряли"},
+				needConfifmation: true,
+			},
 		},
 	}
 }
@@ -80,7 +96,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		case "enter":
-			if m.choices[m.cursor].needConfifmation {
+			if m.choices[choiceType(m.cursor)].needConfifmation {
 				if m.confirmMenuOpen {
 
 					if m.confirmMenuCursor == 0 {
@@ -126,7 +142,8 @@ func viewInformation(m model, s string) string {
 
 func viewChoices(m model, s string) string {
 	s += "Выберите действие:\n"
-	for i, choice := range m.choices {
+	for i := range len(m.choices) {
+		choice := m.choices[choiceType(i)]
 		cursor := " "
 		if m.cursor == i {
 			cursor = ">"
@@ -137,7 +154,9 @@ func viewChoices(m model, s string) string {
 				s += fmt.Sprintf("    %s\n", desc)
 			}
 		}
+
 	}
+
 	s += "\n"
 	s += "Нажмите ← ↓ ↑ → для навигации, Enter для выбора, q для выхода"
 
@@ -145,7 +164,7 @@ func viewChoices(m model, s string) string {
 }
 
 func viewConfirmMenu(m model, s string) string {
-	choice := m.choices[m.cursor]
+	choice := m.choices[choiceType(m.cursor)]
 	s += "Подтвердите выбор\n\n"
 	s += fmt.Sprintf("%s %s\n", ">", choice.title)
 	for _, desc := range choice.description {
