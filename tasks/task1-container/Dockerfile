@@ -2,11 +2,9 @@ FROM golang:1.23-alpine as builder
 
 WORKDIR /git-trainer
 
-COPY git-trainer-in-container/go.mod .
-COPY git-trainer-in-container/go.sum .
-COPY git-trainer-in-container/main.go .
+COPY git-trainer-in-container/. .
 COPY ./description.json .
-RUN go build -o ./git-trainer main.go
+RUN go build -o ./git-trainer .
 
 FROM ubuntu:22.04
 
