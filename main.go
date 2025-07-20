@@ -57,7 +57,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.confirmMenuOpen {
 
 				if m.confirmMenuCursor == 0 {
-					enterTask(m.cursor)
+					enterTask(m.cursor + 1)
 				}
 
 				m.confirmMenuOpen = false
