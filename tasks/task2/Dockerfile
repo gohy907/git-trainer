@@ -14,15 +14,15 @@ ARG GIT_EMAIL=user@aboba.com
 RUN useradd --create-home --shell /bin/bash $USERNAME && apt-get update \
     && apt-get install -y git neovim nano 
 
-COPY task1 /home/$USERNAME/task1
-RUN chmod o+w /home/$USERNAME/task1
+COPY task2 /home/$USERNAME/task2
+RUN chmod o+w /home/$USERNAME/task2
 RUN mkdir /git-trainer 
 
 USER $USERNAME
-WORKDIR /home/$USERNAME/task1
+WORKDIR /home/$USERNAME/task2
 RUN git config --global user.name $GIT_USERNAME \
     && git config --global user.email $GIT_EMAIL \
-    && git config --global --add safe.directory /home/$USERNAME/task1
+    && git config --global --add safe.directory /home/$USERNAME/task2
 
 COPY --from=builder /git-trainer/git-trainer /git-trainer/git-trainer
 COPY --from=builder /git-trainer/description.json /git-trainer/description.json
