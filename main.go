@@ -26,8 +26,8 @@ type model struct {
 func initialModel() model {
 	return model{
 		choices: []choice{
-			{"Сценарий 1", []string{"Lorem ipsum dolor sit amet, consectetur adipiscing elit.", "Donec finibus, tortor nec commodo iaculis, metus."}},
-			{"Сценарий 2", []string{"Lorem ipsum dolor sit amet, consectetur adipiscing elit.", "Ut efficitur, purus ut venenatis viverra, leo."}},
+			{"Привет, мир!", []string{"В этой задаче Вам предстоит создать новый Git репозиторий", "и сделать в нём первый коммит"}},
+			{"Своих не сдаём", []string{"Последний коммит в этой задаче посеял в коде критический баг", "Вам нужно исправить этот баг, не создавая нового коммита"}},
 		},
 	}
 }
@@ -57,8 +57,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.confirmMenuOpen {
 
 				if m.confirmMenuCursor == 0 && !m.executing {
-					m.executing = true
-					return m, startContainer(m.cursor + 1)
+					containerToRun = m.cursor + 1
+					return m, tea.Quit
 				}
 
 				m.confirmMenuOpen = false
@@ -66,7 +66,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.confirmMenuOpen = true
 			}
-
 		case "left", "h":
 			if m.confirmMenuCursor > 0 {
 				m.confirmMenuCursor--
@@ -104,7 +103,7 @@ func (m model) View() string {
 		s += fmt.Sprintf("\n   %s %s\n\n", yes, no)
 
 	} else {
-		s += "Выберите сценарий\n\n"
+		s += "Выберите задачу\n\n"
 		for i, choice := range m.choices {
 			cursor := " "
 			if m.cursor == i {
@@ -133,55 +132,43 @@ type Cmd struct {
 	args []string
 }
 
-func newCmd(name string, args ...string) Cmd {
-	return Cmd{name: name, args: args}
+type restartMsg struct{}
+
+var p *tea.Program
+var containerToRun int
+
+func main() {
+	for {
+		p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Ошибка: %v\n", err)
+			os.Exit(1)
+		}
+
+		if containerToRun > 0 {
+			runContainer(containerToRun)
+			containerToRun = 0
+		} else {
+			break
+		}
+	}
 }
 
-func runCmd(command Cmd) error {
-	cmd := exec.Command(command.name, command.args...)
+func runContainer(taskID int) {
+	clear := exec.Command("clear")
+	err := clear.Run()
+	if err != nil {
+		fmt.Printf("Ошибка")
+	}
+
+	cmd := exec.Command("./run.sh", strconv.Itoa(taskID))
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
 
-func enterTask(taskNumber int) {
-	clear := newCmd("clear")
-	run := newCmd("./run.sh", strconv.Itoa(taskNumber))
-	runCmd(clear)
-	runCmd(run)
-	runCmd(clear)
-
-}
-
-func startContainer(taskID int) tea.Cmd {
-	return func() tea.Msg {
-		clear := newCmd("clear")
-		run := newCmd("./run.sh", strconv.Itoa(taskID))
-		runCmd(clear)
-		runCmd(run)
-		// ВАЖНО: после run.sh нужно "перезапустить" Bubble Tea:
-		return restartMsg{}
+	err = cmd.Run()
+	if err != nil {
+		fmt.Printf("Ошибка запуска контейнера: %v\n", err)
 	}
-}
 
-type restartMsg struct{}
-
-var p *tea.Program // глобальная переменная
-
-func main() {
-	m := initialModel()
-	p = tea.NewProgram(m, tea.WithAltScreen())
-
-	if err := runProgram(); err != nil {
-		fmt.Println("Ошибка:", err)
-		os.Exit(1)
-	}
-}
-
-func runProgram() error {
-	if _, err := p.Run(); err != nil {
-		return err
-	}
-	return nil
 }
