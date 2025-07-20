@@ -15,21 +15,27 @@ type Information struct {
 	Description []string `json:"description"`
 }
 
-func parseJsonAsInformation(name string) Information {
+type Task struct {
+	TaskNumber  int      `json:"taskNumber"`
+	Description []string `json:"description"`
+}
+
+func parseJsonAsTask(name string) Task {
 	file, _ := os.Open(name)
 	defer file.Close()
 
 	bytes, _ := io.ReadAll(file)
 
-	var info Information
-	_ = json.Unmarshal(bytes, &info)
+	var task Task
+	_ = json.Unmarshal(bytes, &task)
 
-	return info
+	return task
 }
 
 var binPath, _ = os.Executable()
-var descFilePath = filepath.Join(filepath.Dir(binPath), "description.json")
-var InfoAboutTask Information = parseJsonAsInformation(descFilePath)
+var descJsonPath = filepath.Join(filepath.Dir(binPath), "description.json")
+
+var task = parseJsonAsTask(descJsonPath)
 
 type model struct {
 	choices map[choiceType]choice
@@ -39,16 +45,18 @@ type model struct {
 	confirmMenuCursor int
 
 	informations []Information
+
+	taskNumber int
 }
 
 func initialModel() model {
 	return model{
 		informations: []Information{
-			{"Описание задания:", InfoAboutTask.Description},
+			{"Описание задания:", task.Description},
 		},
 		choices: map[choiceType]choice{
 			checkForCompletion: {
-				title:            "Описание задания:",
+				title:            "Проверить задание:",
 				description:      []string{"Проверить, выполнены ли цели задания"},
 				needConfifmation: false,
 			},
@@ -67,7 +75,6 @@ func (m model) Init() tea.Cmd {
 }
 
 func main() {
-	fmt.Printf(descFilePath)
 
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {

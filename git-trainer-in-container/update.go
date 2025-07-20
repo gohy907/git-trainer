@@ -21,9 +21,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.choices[choiceType(m.cursor)].needConfifmation {
 				if m.confirmMenuOpen {
-
 					if m.confirmMenuCursor == 0 {
-						enterTask(m.cursor)
+						if choiceType(m.cursor) == restartTask {
+							//restartTask()
+						}
 					}
 
 					m.confirmMenuOpen = false
@@ -32,8 +33,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.confirmMenuOpen = true
 				}
 			} else {
-				if m.cursor == 0 {
-				}
+				// TODO: сделать проверку задания. Пока это единственный выбор без подтверждения
 			}
 
 		case "left", "h":

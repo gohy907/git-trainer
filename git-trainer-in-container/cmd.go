@@ -1,6 +1,7 @@
 package main
 
 import (
+	//	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -30,3 +31,9 @@ func enterTask(taskNumber int) {
 	runCmd(run)
 	runCmd(clear)
 }
+
+// func restartTaskFunc() {
+// 	rm := newCmd("rm", "-rf", "./*")
+// 	clone := newCmd("git", "clone", "")
+// }
+// Нельзя склонировать без SSH ключей
