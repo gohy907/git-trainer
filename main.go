@@ -20,8 +20,7 @@ type model struct {
 	confirmMenuOpen   bool
 	confirmMenuCursor int
 
-	needToExecuteContainer bool
-	taskContainerToExecute int
+	executing bool
 }
 
 func initialModel() model {
@@ -29,8 +28,6 @@ func initialModel() model {
 		choices: []choice{
 			{"Сценарий 1", []string{"Lorem ipsum dolor sit amet, consectetur adipiscing elit.", "Donec finibus, tortor nec commodo iaculis, metus."}},
 			{"Сценарий 2", []string{"Lorem ipsum dolor sit amet, consectetur adipiscing elit.", "Ut efficitur, purus ut venenatis viverra, leo."}},
-			{"Сценарий 3", []string{"Lorem ipsum dolor sit amet, consectetur adipiscing elit.", "Sed cursus efficitur viverra. Proin eget fringilla."}},
-			{"Сценарий 4", []string{"Lorem ipsum dolor sit aboba"}},
 		},
 	}
 }
@@ -41,6 +38,9 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case restartMsg:
+		// Заново инициализируем интерфейс
+		return initialModel(), tea.ClearScreen
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -56,8 +56,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.confirmMenuOpen {
 
-				if m.confirmMenuCursor == 0 {
-					enterTask(m.cursor + 1)
+				if m.confirmMenuCursor == 0 && !m.executing {
+					m.executing = true
+					return m, startContainer(m.cursor + 1)
 				}
 
 				m.confirmMenuOpen = false
@@ -76,11 +77,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.confirmMenuCursor++
 			}
 		}
+
 	}
 	return m, nil
 }
 
 func (m model) View() string {
+
 	var s string
 	if m.confirmMenuOpen {
 		choice := m.choices[m.cursor]
@@ -151,11 +154,34 @@ func enterTask(taskNumber int) {
 
 }
 
-func main() {
+func startContainer(taskID int) tea.Cmd {
+	return func() tea.Msg {
+		clear := newCmd("clear")
+		run := newCmd("./run.sh", strconv.Itoa(taskID))
+		runCmd(clear)
+		runCmd(run)
+		// ВАЖНО: после run.sh нужно "перезапустить" Bubble Tea:
+		return restartMsg{}
+	}
+}
 
-	p := tea.NewProgram(initialModel())
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Alas, there's been an error: %v", err)
+type restartMsg struct{}
+
+var p *tea.Program // глобальная переменная
+
+func main() {
+	m := initialModel()
+	p = tea.NewProgram(m, tea.WithAltScreen())
+
+	if err := runProgram(); err != nil {
+		fmt.Println("Ошибка:", err)
 		os.Exit(1)
 	}
+}
+
+func runProgram() error {
+	if _, err := p.Run(); err != nil {
+		return err
+	}
+	return nil
 }
