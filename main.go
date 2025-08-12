@@ -112,21 +112,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func addChoiceContext(m model) string {
+	var s string
+	choice := m.choices[m.cursor]
+	s += fmt.Sprintf("%s %s\n", ">", choice.title)
+
+	for _, desc := range choice.description {
+		s += fmt.Sprintf("    %s\n", desc)
+	}
+	s += "\n"
+
+	return s
+}
+
+func addActionContext(m model) string {
+	var s string
+	actionChoosed := defaultActions[m.selectActionCursor]
+	s += fmt.Sprintf("   %s %s\n", ">>", actionChoosed.info)
+	return s
+}
+
 func (m model) View() string {
 
 	var s string
-	choice := m.choices[m.cursor]
 
 	if m.selectActionMenuOpen && m.confirmMenuOpen {
-		actionChoosed := defaultActions[m.selectActionCursor]
 		s += "Подтвердите выбор\n\n"
-		s += fmt.Sprintf("%s %s\n", ">", choice.title)
-
-		for _, desc := range choice.description {
-			s += fmt.Sprintf("    %s\n", desc)
-		}
-		s += "\n"
-		s += fmt.Sprintf("   >> %s\n", actionChoosed.info)
+		s += addChoiceContext(m)
+		s += addActionContext(m)
 
 		yes := "     да "
 		no := " нет "
@@ -140,12 +153,7 @@ func (m model) View() string {
 		s += fmt.Sprintf("\n   %s %s\n", yes, no)
 	} else if m.selectActionMenuOpen {
 		s += "Выберите действие\n\n"
-		s += fmt.Sprintf("%s %s\n", ">", choice.title)
-		for _, desc := range choice.description {
-			s += fmt.Sprintf("    %s\n", desc)
-		}
-
-		s += "\n"
+		s += addChoiceContext(m)
 
 		for i, action := range defaultActions {
 			cursor := "     "
