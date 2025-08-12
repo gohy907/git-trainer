@@ -23,6 +23,26 @@ type model struct {
 	executing bool
 }
 
+type actionDescription string
+
+const (
+	enter        actionDescription = "Начать задание"
+	save         actionDescription = "Отправить на проверку"
+	restart      actionDescription = "Перезагрузить задание"
+	continueTask actionDescription = "Продолжить задание"
+)
+
+type action struct {
+	info             actionDescription
+	needConfirmation bool
+}
+
+var defaultActions = []action{
+	{enter, true},
+	{save, true},
+	{restart, true},
+}
+
 func initialModel() model {
 	return model{
 		choices: []task{
