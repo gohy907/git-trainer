@@ -172,3 +172,21 @@ func runContainer(taskID int) {
 	}
 
 }
+
+func sendTask(taskID int) {
+	task := "task" + strconv.Itoa(taskID)
+	taskImage := task + ":$USER_attempt"
+	cmd := exec.Command("docker", "commit", task, taskImage,
+		"&&", "docker", "save", "-o", fmt.Sprintf("~/.git-trainer/attempts/%s.tar", task+"$USER_attempt"), taskImage,
+		"&&", "docker", "rmi", taskImage)
+
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Run()
+	if err != nil {
+		fmt.Printf("Ошибка сохранения контейнера: %v\n", err)
+	}
+
+}
