@@ -17,6 +17,9 @@ type model struct {
 	choices []task
 	cursor  int
 
+	selectActionCursor   int
+	selectActionMenuOpen bool
+
 	confirmMenuOpen   bool
 	confirmMenuCursor int
 
@@ -66,25 +69,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "up", "k":
-			if !m.confirmMenuOpen && m.cursor > 0 {
+			if !m.selectActionMenuOpen && m.cursor > 0 {
 				m.cursor--
+			} else if !m.confirmMenuOpen && m.selectActionCursor > 0 {
+				m.selectActionCursor--
 			}
 		case "down", "j":
-			if !m.confirmMenuOpen && m.cursor < len(m.choices)-1 {
+			if !m.selectActionMenuOpen && m.cursor < len(m.choices)-1 {
 				m.cursor++
+			} else if !m.confirmMenuOpen && m.selectActionCursor < len(defaultActions)-1 {
+				m.selectActionCursor++
 			}
 		case "enter":
-			if m.confirmMenuOpen {
+			if m.selectActionMenuOpen {
+				if m.confirmMenuOpen {
 
-				if m.confirmMenuCursor == 0 && !m.executing {
-					containerToRun = m.cursor + 1
-					return m, tea.Quit
+					if m.confirmMenuCursor == 0 && !m.executing {
+						containerToRun = m.cursor + 1
+						return m, tea.Quit
+					}
+
+					m.confirmMenuOpen = false
+
+				} else {
+					m.confirmMenuOpen = true
 				}
-
-				m.confirmMenuOpen = false
-
 			} else {
-				m.confirmMenuOpen = true
+				m.selectActionMenuOpen = true
 			}
 		case "left", "h":
 			if m.confirmMenuCursor > 0 {
@@ -104,23 +115,45 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 
 	var s string
-	if m.confirmMenuOpen {
-		choice := m.choices[m.cursor]
+	choice := m.choices[m.cursor]
+
+	if m.selectActionMenuOpen && m.confirmMenuOpen {
+		actionChoosed := defaultActions[m.selectActionCursor]
 		s += "Подтвердите выбор\n\n"
 		s += fmt.Sprintf("%s %s\n", ">", choice.title)
+
 		for _, desc := range choice.description {
 			s += fmt.Sprintf("    %s\n", desc)
 		}
-		yes := " да "
+		s += "\n"
+		s += fmt.Sprintf("   >> %s\n", actionChoosed.info)
+
+		yes := "     да "
 		no := " нет "
 
 		if m.confirmMenuCursor == 0 {
-			yes = "[да]"
+			yes = "    [да]"
 		} else {
 			no = "[нет]"
 		}
 
-		s += fmt.Sprintf("\n   %s %s\n\n", yes, no)
+		s += fmt.Sprintf("\n   %s %s\n", yes, no)
+	} else if m.selectActionMenuOpen {
+		s += "Выберите действие\n\n"
+		s += fmt.Sprintf("%s %s\n", ">", choice.title)
+		for _, desc := range choice.description {
+			s += fmt.Sprintf("    %s\n", desc)
+		}
+
+		s += "\n"
+
+		for i, action := range defaultActions {
+			cursor := "     "
+			if m.selectActionCursor == i {
+				cursor = "   >>"
+			}
+			s += fmt.Sprintf("%s %s\n", cursor, action.info)
+		}
 
 	} else {
 		s += "Выберите задачу\n\n"
@@ -136,8 +169,9 @@ func (m model) View() string {
 				}
 			}
 		}
-		s += "\n"
 	}
+
+	s += "\n"
 
 	if m.confirmMenuOpen {
 		s += "Нажмите ← или → для навигации, Enter для выбора, q для выхода"
