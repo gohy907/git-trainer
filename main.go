@@ -8,13 +8,13 @@ import (
 	"strconv"
 )
 
-type choice struct {
+type task struct {
 	title       string
 	description []string
 }
 
 type model struct {
-	choices []choice
+	choices []task
 	cursor  int
 
 	confirmMenuOpen   bool
@@ -25,7 +25,7 @@ type model struct {
 
 func initialModel() model {
 	return model{
-		choices: []choice{
+		choices: []task{
 			{"Привет, мир!", []string{"В этой задаче Вам предстоит создать новый Git репозиторий", "и сделать в нём первый коммит"}},
 			{"Своих не сдаём", []string{"Последний коммит в этой задаче посеял в коде критический баг", "Вам нужно исправить этот баг, не создавая нового коммита"}},
 		},
