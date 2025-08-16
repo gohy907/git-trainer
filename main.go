@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	tea "github.com/charmbracelet/bubbletea"
 	"os"
 	"os/exec"
 	"strconv"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 type task struct {
@@ -30,7 +31,7 @@ type actionDescription string
 
 const (
 	enter        actionDescription = "Начать задание"
-	save         actionDescription = "Отправить на проверку"
+	send         actionDescription = "Отправить на проверку"
 	restart      actionDescription = "Перезагрузить задание"
 	continueTask actionDescription = "Продолжить задание"
 )
@@ -42,7 +43,7 @@ type action struct {
 
 var defaultActions = []action{
 	{enter, true},
-	{save, true},
+	{send, true},
 	{restart, true},
 }
 
@@ -83,14 +84,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.selectActionMenuOpen {
 				if m.confirmMenuOpen {
+					if m.confirmMenuCursor == 0 {
+						switch defaultActions[m.selectActionCursor].info {
+						case enter:
+							if !m.executing {
+								containerToRun = m.cursor + 1
+								return m, tea.Quit
+							}
+						case send:
+							sendTask(m.cursor + 1)
+						}
 
-					if m.confirmMenuCursor == 0 && !m.executing {
-						containerToRun = m.cursor + 1
-						return m, tea.Quit
 					}
-
 					m.confirmMenuOpen = false
-
 				} else {
 					m.confirmMenuOpen = true
 				}
@@ -235,20 +241,32 @@ func runContainer(taskID int) {
 
 }
 
+func execChainOfCmds(chain [][]string) {
+	for _, string := range chain {
+		cmd := exec.Command(string[0], string[1:]...)
+		err := cmd.Run()
+		if err != nil {
+			fmt.Printf("%v\n", err)
+		}
+	}
+}
+
 func sendTask(taskID int) {
+	user := os.Getenv("USER")
 	task := "task" + strconv.Itoa(taskID)
-	taskImage := task + ":$USER_attempt"
-	cmd := exec.Command("docker", "commit", task, taskImage,
-		"&&", "docker", "save", "-o", fmt.Sprintf("~/.git-trainer/attempts/%s.tar", task+"$USER_attempt"), taskImage,
-		"&&", "docker", "rmi", taskImage)
+	taskImage := task + ":" + user + "_attempt"
 
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err := cmd.Run()
-	if err != nil {
-		fmt.Printf("Ошибка сохранения контейнера: %v\n", err)
+	chain := [][]string{
+		{
+			"docker", "commit", task, taskImage,
+		},
+		{
+			"docker", "save", "-o", fmt.Sprintf("/home//.git-trainer/attempts/%s.tar", task+user+"_attempt"), taskImage,
+		},
+		{
+			"docker", "rmi", taskImage,
+		},
 	}
 
+	execChainOfCmds(chain)
 }
