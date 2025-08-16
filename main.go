@@ -239,10 +239,10 @@ func runContainer(taskID int) {
 func execChainOfCmds(chain [][]string) {
 	for _, string := range chain {
 		cmd := exec.Command(string[0], string[1:]...)
-		err := cmd.Run()
-		if err != nil {
-			fmt.Printf("%v\n", err)
-		}
+		cmd.Run()
+		// if err != nil {
+		// 	fmt.Printf("%v\n", err)
+		// }
 	}
 }
 
@@ -260,10 +260,10 @@ func sendTask(taskID int) {
 			"mkdir", "-p", dirToSaveTask,
 		},
 		{
-			"docker", "cp", "-r", fmt.Sprintf("/home/%s/%s/.git", user, task), fmt.Sprintf("%s/.git", dirToSave),
+			"docker", "cp", fmt.Sprintf("%s:/home/%s/%s/.git", task, user, task), fmt.Sprintf("%s/.git", dirToSaveTask),
 		},
 		{
-			"docker", "cp", "-r", fmt.Sprintf("/home/%s/.bash_history", user), fmt.Sprintf("%s/.bash_history", dirToSave),
+			"docker", "cp", fmt.Sprintf("%s:/home/%s/.bash_history", task, user), fmt.Sprintf("%s/.bash_history", dirToSaveTask),
 		},
 	}
 
