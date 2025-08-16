@@ -30,7 +30,7 @@ type actionDescription string
 
 const (
 	enter        actionDescription = "Начать задание"
-	save         actionDescription = "Отправить на проверку"
+	send         actionDescription = "Отправить на проверку"
 	restart      actionDescription = "Перезагрузить задание"
 	continueTask actionDescription = "Продолжить задание"
 )
@@ -42,7 +42,7 @@ type action struct {
 
 var defaultActions = []action{
 	{enter, true},
-	{save, true},
+	{send, true},
 	{restart, true},
 }
 
@@ -82,15 +82,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "enter":
 			if m.selectActionMenuOpen {
-				if m.confirmMenuOpen {
-
-					if m.confirmMenuCursor == 0 && !m.executing {
-						containerToRun = m.cursor + 1
-						return m, tea.Quit
+				if m.confirmMenuCursor == 0 {
+					switch defaultActions[m.selectActionCursor].info {
+					case enter:
+						if !m.executing {
+							containerToRun = m.cursor + 1
+							return m, tea.Quit
+						}
+					case send:
+						sendTask(m.cursor + 1)
 					}
-
-					m.confirmMenuOpen = false
-
 				} else {
 					m.confirmMenuOpen = true
 				}
@@ -262,7 +263,7 @@ func sendTask(taskID int) {
 			"docker", "cp", "-r", fmt.Sprintf("/home/%s/%s/.git", user, task), fmt.Sprintf("%s/.git", dirToSave),
 		},
 		{
-		"docker", "cp", "-r", fmt.Sprintf("/home/%s/.bash_history", user), fmt.Sprintf("%s/.bash_history", dirToSave)
+			"docker", "cp", "-r", fmt.Sprintf("/home/%s/.bash_history", user), fmt.Sprintf("%s/.bash_history", dirToSave),
 		},
 	}
 
