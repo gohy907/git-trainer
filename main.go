@@ -235,16 +235,26 @@ func runContainer(taskID int) {
 
 }
 
-func sendTask(taskID int) {
-	task := "task" + strconv.Itoa(taskID)
-	taskImage := task + ":$USER_attempt"
-	cmd := exec.Command("docker", "commit", task, taskImage,
-		"&&", "docker", "save", "-o", fmt.Sprintf("~/.git-trainer/attempts/%s.tar", task+"$USER_attempt"), taskImage,
-		"&&", "docker", "rmi", taskImage)
+func execChainOfCmds(chain [][]string) {
+	for _, string := range chain {
+		cmd := exec.Command(string[0], string[1:]...)
+		err := cmd.Run()
+		if err != nil {
+			fmt.Printf("%v\n", err)
+		}
+	}
+}
 
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+func sendTask(taskID int) {
+	user := os.Getenv("USER")
+	task := "task" + strconv.Itoa(taskID)
+	taskImage := task + ":" + user + "_attempt"
+
+	chain := [][]string{
+		{
+			"mkdir", "-p", fmt.Sprintf("/home/%s/attempts", user),
+		},
+	}
 
 	err := cmd.Run()
 	if err != nil {
