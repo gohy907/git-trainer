@@ -248,17 +248,23 @@ func execChainOfCmds(chain [][]string) {
 func sendTask(taskID int) {
 	user := os.Getenv("USER")
 	task := "task" + strconv.Itoa(taskID)
-	taskImage := task + ":" + user + "_attempt"
+	dirToSave := fmt.Sprintf("/home/%s/.git-trainer", user)
+	dirToSaveTask := fmt.Sprintf("%s/%s", dirToSave, task)
 
 	chain := [][]string{
 		{
-			"mkdir", "-p", fmt.Sprintf("/home/%s/attempts", user),
+			"mkdir", "-p", dirToSave,
+		},
+		{
+			"mkdir", "-p", dirToSaveTask,
+		},
+		{
+			"docker", "cp", "-r", fmt.Sprintf("/home/%s/%s/.git", user, task), fmt.Sprintf("%s/.git", dirToSave),
+		},
+		{
+		"docker", "cp", "-r", fmt.Sprintf("/home/%s/.bash_history", user), fmt.Sprintf("%s/.bash_history", dirToSave)
 		},
 	}
 
-	err := cmd.Run()
-	if err != nil {
-		fmt.Printf("Ошибка сохранения контейнера: %v\n", err)
-	}
-
+	execChainOfCmds(chain)
 }
