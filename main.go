@@ -258,10 +258,13 @@ func sendTask(taskID int) {
 
 	chain := [][]string{
 		{
+			"mkdir", "-p", fmt.Sprintf("/home/%s/attempts", user),
+		},
+		{
 			"docker", "commit", task, taskImage,
 		},
 		{
-			"docker", "save", "-o", fmt.Sprintf("/home//.git-trainer/attempts/%s.tar", task+user+"_attempt"), taskImage,
+			"docker", "save", "-o", fmt.Sprintf("/home/%s/.git-trainer/attempts/%s.tar", user, task+user+"_attempt"), taskImage,
 		},
 		{
 			"docker", "rmi", taskImage,
