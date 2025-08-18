@@ -11,6 +11,9 @@ import (
 type task struct {
 	title       string
 	description []string
+
+	EnteredBefore bool `json:"enteredBefore"`
+	AttemptsSent  int  `json:"attemptsSent"`
 }
 
 type model struct {
@@ -46,12 +49,25 @@ var defaultActions = []action{
 	{restart, true},
 }
 
+func initTask(title string, description []string) task {
+	return task{
+		title:         title,
+		description:   description,
+		EnteredBefore: false,
+		AttemptsSent:  0,
+	}
+}
+
+func initTasks() []task {
+	return []task{
+		initTask("Привет, мир!", []string{"В этой задаче Вам предстоит создать новый Git репозиторий", "и сделать в нём первый коммит"}),
+		initTask("Своих не сдаём", []string{"Последний коммит в этой задаче посеял в коде критический баг", "Вам нужно исправить этот баг, не создавая нового коммита"}),
+	}
+}
+
 func initialModel() model {
 	return model{
-		choices: []task{
-			{"Привет, мир!", []string{"В этой задаче Вам предстоит создать новый Git репозиторий", "и сделать в нём первый коммит"}},
-			{"Своих не сдаём", []string{"Последний коммит в этой задаче посеял в коде критический баг", "Вам нужно исправить этот баг, не создавая нового коммита"}},
-		},
+		choices: initTasks(),
 	}
 }
 
@@ -62,7 +78,6 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case restartMsg:
-		// Заново инициализируем интерфейс
 		return initialModel(), tea.ClearScreen
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -197,10 +212,15 @@ type Cmd struct {
 
 type restartMsg struct{}
 
-var p *tea.Program
 var containerToRun int
 
 func main() {
+	_, err := os.ReadFile("config.json")
+	if err != nil {
+		if os.IsNotExist(err) {
+			defaultConfig(initTasks())
+		}
+	}
 	for {
 		p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
