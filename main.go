@@ -215,12 +215,7 @@ type restartMsg struct{}
 var containerToRun int
 
 func main() {
-	_, err := os.ReadFile("config.json")
-	if err != nil {
-		if os.IsNotExist(err) {
-			defaultConfig(initTasks())
-		}
-	}
+	checkForConfig()
 	for {
 		p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {

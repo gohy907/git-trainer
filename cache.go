@@ -24,3 +24,12 @@ func defaultConfig(tasks []task) {
 		fmt.Println("Ошибка: ", err)
 	}
 }
+
+func checkForConfig() {
+	_, err := os.ReadFile("config.json")
+	if err != nil {
+		if os.IsNotExist(err) {
+			defaultConfig(initTasks())
+		}
+	}
+}
