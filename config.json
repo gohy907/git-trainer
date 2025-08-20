@@ -1,5 +1,5 @@
 {
-    "0": {
+    0: {
         "id": 0,
         "title": "Привет, мир!",
         "description":
@@ -10,7 +10,7 @@
         "enteredBefore": false, 
         "attemptsSent": 0
     },
-    "1": {
+    1: {
         "id": 1,
         "title": "Своих не сдаём",
         "description": {
@@ -21,3 +21,4 @@
         "attemptsSent": 0
     }
 }
+
