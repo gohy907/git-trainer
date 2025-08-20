@@ -9,8 +9,10 @@ import (
 )
 
 type task struct {
-	title       string
-	description []string
+	Id int `json:"id"`
+
+	Title       string   `json:"title"`
+	Description []string `json:"description"`
 
 	EnteredBefore bool `json:"enteredBefore"`
 	AttemptsSent  int  `json:"attemptsSent"`
