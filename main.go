@@ -17,8 +17,8 @@ type task struct {
 }
 
 type model struct {
-	choices []task
-	cursor  int
+	tasks  []task
+	cursor int
 
 	selectActionCursor   int
 	selectActionMenuOpen bool
@@ -67,7 +67,7 @@ func initTasks() []task {
 
 func initialModel() model {
 	return model{
-		choices: initTasks(),
+		tasks: initTasks(),
 	}
 }
 
@@ -90,7 +90,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectActionCursor--
 			}
 		case "down", "j":
-			if !m.selectActionMenuOpen && m.cursor < len(m.choices)-1 {
+			if !m.selectActionMenuOpen && m.cursor < len(m.tasks)-1 {
 				m.cursor++
 			} else if !m.confirmMenuOpen && m.selectActionCursor < len(defaultActions)-1 {
 				m.selectActionCursor++
@@ -128,9 +128,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func addChoiceContext(m model) string {
+func addTaskContext(m model) string {
 	var s string
-	choice := m.choices[m.cursor]
+	choice := m.tasks[m.cursor]
 	s += fmt.Sprintf("%s %s\n", ">", choice.title)
 
 	for _, desc := range choice.description {
@@ -154,7 +154,7 @@ func (m model) View() string {
 
 	if m.selectActionMenuOpen && m.confirmMenuOpen {
 		s += "Подтвердите выбор\n\n"
-		s += addChoiceContext(m)
+		s += addTaskContext(m)
 		s += addActionContext(m)
 
 		yes := "     да "
@@ -169,7 +169,7 @@ func (m model) View() string {
 		s += fmt.Sprintf("\n   %s %s\n", yes, no)
 	} else if m.selectActionMenuOpen {
 		s += "Выберите действие\n\n"
-		s += addChoiceContext(m)
+		s += addTaskContext(m)
 
 		for i, action := range defaultActions {
 			cursor := "     "
@@ -181,7 +181,7 @@ func (m model) View() string {
 
 	} else {
 		s += "Выберите задачу\n\n"
-		for i, choice := range m.choices {
+		for i, choice := range m.tasks {
 			cursor := " "
 			if m.cursor == i {
 				cursor = ">"
