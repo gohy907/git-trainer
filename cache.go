@@ -33,3 +33,13 @@ func checkForConfig() {
 		}
 	}
 }
+
+func getTaskConfigAsMap(taskID int) map[string]any {
+	configData, err := os.ReadFile("config.json")
+	if err != nil {
+		fmt.Println("Ошибка: ", err)
+	}
+	var config map[int]map[string]any
+	err = json.Unmarshal(configData, &config)
+	return config[taskID]
+}
