@@ -34,7 +34,7 @@ func checkForConfig() {
 	}
 }
 
-func getTasksAsConfig() []task {
+func getTasksFromConfig() []task {
 	jsonBytes, err := os.ReadFile("config.json")
 	if err != nil {
 		fmt.Println("Ошибка: ", err)
