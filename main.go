@@ -53,8 +53,8 @@ var defaultActions = []action{
 
 func initTask(title string, description []string) task {
 	return task{
-		title:         title,
-		description:   description,
+		Title:         title,
+		Description:   description,
 		EnteredBefore: false,
 		AttemptsSent:  0,
 	}
@@ -133,9 +133,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func addTaskContext(m model) string {
 	var s string
 	choice := m.tasks[m.cursor]
-	s += fmt.Sprintf("%s %s\n", ">", choice.title)
+	s += fmt.Sprintf("%s %s\n", ">", choice.Title)
 
-	for _, desc := range choice.description {
+	for _, desc := range choice.Description {
 		s += fmt.Sprintf("    %s\n", desc)
 	}
 	s += "\n"
@@ -188,9 +188,10 @@ func (m model) View() string {
 			if m.cursor == i {
 				cursor = ">"
 			}
-			s += fmt.Sprintf("%s %s\n", cursor, choice.title)
+			s += fmt.Sprintf("%s %s\n", cursor, choice.Title)
+
 			if m.cursor == i {
-				for _, desc := range choice.description {
+				for _, desc := range choice.Description {
 					s += fmt.Sprintf("    %s\n", desc)
 				}
 			}
