@@ -1,8 +1,9 @@
 use crate::Frame;
 use crate::app::App;
 use ratatui::prelude::{Constraint, Direction, Layout};
+use ratatui::style::Color;
 use ratatui::{
-    style::Stylize,
+    style::{Style, Stylize},
     text::Line,
     widgets::{Block, Paragraph},
 };
@@ -10,8 +11,17 @@ use ratatui::{
 pub fn ui(frame: &mut Frame, app: &App) {
     let title = Line::from("git-trainer v0.0.1-beta-alpha-gamma-shtrih".bold());
     let mut lines_of_tasks = Vec::new();
-    for task in app.names_of_tasks.clone() {
-        lines_of_tasks.push(Line::from(task).left_aligned())
+    for (i, task) in app.names_of_tasks.clone().iter().enumerate() {
+        let line: Line;
+        if app.task_under_cursor == i {
+            line = Line::from(task.clone())
+                .left_aligned()
+                .style(Style::default().bg(Color::White))
+                .fg(Color::Black);
+        } else {
+            line = Line::from(task.clone()).left_aligned();
+        }
+        lines_of_tasks.push(line);
     }
     // let a = Line::from(self.names_of_tasks);
     let outer_layout = Layout::default()

@@ -9,6 +9,7 @@ use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 pub struct App {
     pub names_of_tasks: Vec<String>,
+    pub task_under_cursor: usize,
     pub exit: bool,
 }
 
@@ -17,6 +18,7 @@ impl App {
         App {
             names_of_tasks: vec!["Привет, мир!".to_string(), "Своих не сдаём".to_string()],
             exit: false,
+            task_under_cursor: 0,
         }
     }
 
@@ -42,9 +44,24 @@ impl App {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
+            KeyCode::Up => self.move_cursor_up(),
+            KeyCode::Down => self.move_cursor_down(),
             _ => {}
         }
     }
+
+    fn move_cursor_up(&mut self) {
+        if self.task_under_cursor != 0 {
+            self.task_under_cursor -= 1;
+        }
+    }
+
+    fn move_cursor_down(&mut self) {
+        if self.task_under_cursor != self.names_of_tasks.len() - 1 {
+            self.task_under_cursor += 1;
+        }
+    }
+
     fn exit(&mut self) {
         self.exit = true;
     }
