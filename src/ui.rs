@@ -39,11 +39,11 @@ pub fn ui(frame: &mut Frame, app: &App) {
 
     let tasks_paragraph = Paragraph::new(lines_of_tasks)
         .centered()
-        .block(Block::bordered());
+        .block(Block::bordered().title("Задания"));
 
     let description_paragraph = Paragraph::new(active_description)
         .centered()
-        .block(Block::bordered())
+        .block(Block::bordered().title("Описание"))
         .wrap(Wrap { trim: true });
     frame.render_widget(title, outer_layout[0]);
     frame.render_widget(tasks_paragraph, inner_layout[0]);
