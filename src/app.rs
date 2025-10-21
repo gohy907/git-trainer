@@ -7,9 +7,8 @@ use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
-use std::collections::HashMap;
 pub struct App {
-    pub tasks: HashMap<String, String>,
+    pub tasks: Vec<(String, String)>,
     pub task_under_cursor: usize,
     pub exit: bool,
 }
@@ -17,7 +16,7 @@ pub struct App {
 impl App {
     pub fn new() -> App {
         App {
-            tasks: HashMap::from([
+            tasks: vec![
                 (
                     "Привет, мир!".to_string(),
                     "В этой задаче Вам предстоит создать новый Git репозиторий и сделать в нём первый коммит.".to_string(),
@@ -30,7 +29,7 @@ impl App {
                 "Ещё какое-то там задание".to_string(),
                 "Надо двери в котельную замерить".to_string()
             )
-            ]),
+            ],
             exit: false,
             task_under_cursor: 0,
         }
