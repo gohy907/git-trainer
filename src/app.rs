@@ -1,7 +1,8 @@
-use crate::DefaultTerminal;
-use crate::Frame;
+use crate::Backend;
+use crate::Terminal;
 use crate::app::event::Event;
 use crate::io;
+use crate::ui;
 use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
@@ -19,16 +20,12 @@ impl App {
         }
     }
 
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+    pub fn run_app<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
         while !self.exit {
-            terminal.draw(|frame| self.draw(frame))?;
+            terminal.draw(|f| ui(f, &self))?;
             self.handle_events()?;
         }
         Ok(())
-    }
-
-    fn draw(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.area());
     }
 
     fn handle_events(&mut self) -> io::Result<()> {

@@ -1,14 +1,16 @@
 mod app;
 mod ui;
 use crate::app::App;
-use ratatui::{DefaultTerminal, Frame};
+use crate::ui::ui;
+use ratatui::prelude::Backend;
+use ratatui::{Frame, Terminal};
 use std::io;
 
-fn main() -> io::Result<()> {
+fn main() {
     let _ = color_eyre::install();
     let mut terminal = ratatui::init();
-    let app_result = App::new().run(&mut terminal);
 
+    let mut app = App::new();
+    let _ = app.run_app(&mut terminal);
     ratatui::restore();
-    app_result
 }
