@@ -7,8 +7,9 @@ use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
+use std::collections::HashMap;
 pub struct App {
-    pub names_of_tasks: Vec<String>,
+    pub tasks: HashMap<String, String>,
     pub task_under_cursor: usize,
     pub exit: bool,
 }
@@ -16,7 +17,20 @@ pub struct App {
 impl App {
     pub fn new() -> App {
         App {
-            names_of_tasks: vec!["Привет, мир!".to_string(), "Своих не сдаём".to_string()],
+            tasks: HashMap::from([
+                (
+                    "Привет, мир!".to_string(),
+                    "В этой задаче Вам предстоит создать новый Git репозиторий и сделать в нём первый коммит.".to_string(),
+                ),
+                (
+                    "Своих не сдаём!".to_string(), 
+                    "Последний коммит в этой задаче посеял в коде критический баг. Вам нужно исправить этот баг, не создавая нового коммита.".to_string(),
+                ),
+                (
+                "Ещё какое-то там задание".to_string(),
+                "Надо двери в котельную замерить".to_string()
+            )
+            ]),
             exit: false,
             task_under_cursor: 0,
         }
@@ -57,7 +71,7 @@ impl App {
     }
 
     fn move_cursor_down(&mut self) {
-        if self.task_under_cursor != self.names_of_tasks.len() - 1 {
+        if self.task_under_cursor != self.tasks.len() - 1 {
             self.task_under_cursor += 1;
         }
     }
