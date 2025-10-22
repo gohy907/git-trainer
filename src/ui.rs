@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 pub fn ui(frame: &mut Frame, app: &App) {
-    let title = Line::from("git-trainer v0.0.1".bold());
+    let title = Line::from("git-trainer v0.0.1".bold()).centered();
     let mut lines_of_tasks = Vec::new();
     let mut active_description = Line::from("aboba".to_owned());
     for (i, (task, description)) in app.tasks.iter().enumerate() {
@@ -29,7 +29,11 @@ pub fn ui(frame: &mut Frame, app: &App) {
 
     let outer_layout = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(1),
+        ])
         .split(frame.area());
 
     let inner_layout = Layout::default()
@@ -45,6 +49,10 @@ pub fn ui(frame: &mut Frame, app: &App) {
         .centered()
         .block(Block::bordered().title("Описание"))
         .wrap(Wrap { trim: true });
+
+    let how_to_use_string = "← ↑ ↓ → для перемещения, q для выхода".to_string();
+    let how_to_use = Paragraph::new(how_to_use_string).centered();
+    frame.render_widget(how_to_use, outer_layout[2]);
     frame.render_widget(title, outer_layout[0]);
     frame.render_widget(tasks_paragraph, inner_layout[0]);
     frame.render_widget(description_paragraph, inner_layout[1]);
