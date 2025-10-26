@@ -12,18 +12,26 @@ use ratatui::{
 pub fn ui(frame: &mut Frame, app: &App) {
     let title = Line::from("git-trainer v0.0.1".bold()).centered();
     let mut lines_of_tasks = Vec::new();
-    let mut active_description = Line::from("aboba".to_owned());
+
+    let active_description = app
+        .tasks
+        .iter()
+        .enumerate()
+        .find_map(|(i, task)| {
+            (app.task_under_cursor == i)
+                .then(|| Line::from(task.description.clone()).left_aligned())
+        })
+        .expect("Active task must exist");
+
     for (i, task) in app.tasks.iter().enumerate() {
-        let line: Line;
-        if app.task_under_cursor == i {
-            line = Line::from(task.name.clone())
+        let line = if app.task_under_cursor == i {
+            Line::from(task.name.clone())
                 .left_aligned()
                 .style(Style::default().bg(Color::White))
-                .fg(Color::Black);
-            active_description = Line::from(task.description.clone()).left_aligned();
+                .fg(Color::Black)
         } else {
-            line = Line::from(task.name.clone()).left_aligned();
-        }
+            Line::from(task.name.clone()).left_aligned()
+        };
 
         lines_of_tasks.push(line);
     }
@@ -53,6 +61,7 @@ pub fn ui(frame: &mut Frame, app: &App) {
 
     let how_to_use_string = "← ↑ ↓ → для перемещения, q для выхода".to_string();
     let how_to_use = Paragraph::new(how_to_use_string).centered();
+
     frame.render_widget(how_to_use, outer_layout[2]);
     frame.render_widget(title, outer_layout[0]);
     frame.render_widget(tasks_paragraph, inner_layout[0]);
