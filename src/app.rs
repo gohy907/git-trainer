@@ -80,7 +80,10 @@ impl App {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Up => self.move_cursor_up(),
             KeyCode::Down => self.move_cursor_down(),
-            KeyCode::Enter => self.toogle_popup(),
+            KeyCode::Enter => self.is_popup_active = true,
+            KeyCode::Esc => {
+                self.is_popup_active = false;
+            }
             _ => {}
         }
     }
@@ -99,9 +102,5 @@ impl App {
 
     fn exit(&mut self) {
         self.exit = true;
-    }
-
-    fn toogle_popup(&mut self) {
-        self.is_popup_active = !self.is_popup_active;
     }
 }
