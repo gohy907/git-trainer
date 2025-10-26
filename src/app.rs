@@ -7,9 +7,12 @@ use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
+
+// TODO: Rewrite tasks in struct
 pub struct App {
     pub tasks: Vec<(String, String)>,
     pub task_under_cursor: usize,
+    pub is_popup_active: bool,
     pub exit: bool,
 }
 
@@ -22,7 +25,8 @@ impl App {
                     "В этой задаче Вам предстоит создать новый Git репозиторий и сделать в нём первый коммит.".to_string(),
                 ),
                 (
-                    "Своих не сдаём!".to_string(), 
+                    "Своих не сдаём!".to_string(),
+                    // TODO: Shorten the string
                     "Последний коммит в этой задаче посеял в коде критический баг. Вам нужно исправить этот баг, не создавая нового коммита.".to_string(),
                 ),
                 (
@@ -31,6 +35,7 @@ impl App {
             )
             ],
             exit: false,
+            is_popup_active: false,
             task_under_cursor: 0,
         }
     }
@@ -54,11 +59,13 @@ impl App {
         };
         Ok(())
     }
+
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Up => self.move_cursor_up(),
             KeyCode::Down => self.move_cursor_down(),
+            KeyCode::Enter => self.toogle_popup(),
             _ => {}
         }
     }
@@ -77,5 +84,9 @@ impl App {
 
     fn exit(&mut self) {
         self.exit = true;
+    }
+
+    fn toogle_popup(&mut self) {
+        self.is_popup_active = !self.is_popup_active;
     }
 }

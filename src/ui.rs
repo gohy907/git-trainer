@@ -1,11 +1,12 @@
 use crate::Frame;
 use crate::app::App;
-use ratatui::prelude::{Constraint, Direction, Layout};
+use ratatui::layout::{Alignment, Flex};
+use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use ratatui::style::Color;
 use ratatui::{
     style::{Style, Stylize},
     text::Line,
-    widgets::{Block, Paragraph, Wrap},
+    widgets::{Block, Clear, Paragraph, Wrap},
 };
 
 pub fn ui(frame: &mut Frame, app: &App) {
@@ -56,4 +57,41 @@ pub fn ui(frame: &mut Frame, app: &App) {
     frame.render_widget(title, outer_layout[0]);
     frame.render_widget(tasks_paragraph, inner_layout[0]);
     frame.render_widget(description_paragraph, inner_layout[1]);
+
+    if app.is_popup_active {
+        let lines_of_popup = vec![
+            popup_line("Начать выполнение задания?"),
+            popup_line("Enter — подтвердить, Esc — отменить"),
+        ];
+
+        let popup_block = Block::bordered()
+            .fg(Color::LightBlue)
+            .title("Подтвердите выбор")
+            .title_alignment(Alignment::Center);
+
+        let popup_content = Paragraph::new(lines_of_popup)
+            .centered()
+            .style(Style::default().fg(Color::LightBlue))
+            .wrap(Wrap { trim: true });
+
+        let area = popup_area(frame.area(), 40, 10);
+
+        let aboba = popup_area(area, 40, 2);
+
+        frame.render_widget(Clear, area);
+        frame.render_widget(popup_block, area);
+        frame.render_widget(popup_content, aboba);
+    }
+}
+
+fn popup_area(area: Rect, x: u16, y: u16) -> Rect {
+    let vertical = Layout::vertical([Constraint::Length(y)]).flex(Flex::Center);
+    let horizontal = Layout::horizontal([Constraint::Length(x)]).flex(Flex::Center);
+    let [area] = vertical.areas(area);
+    let [area] = horizontal.areas(area);
+    area
+}
+
+fn popup_line<'a>(s: &'a str) -> Line<'a> {
+    Line::from(s).style(Style::default().fg(Color::LightBlue))
 }
