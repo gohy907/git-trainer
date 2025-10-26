@@ -8,9 +8,23 @@ use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 
+pub struct Task {
+    pub name: String,
+    pub description: String,
+}
+
+impl Task {
+    pub fn new(name: &str, description: &str) -> Task {
+        Task {
+            name: name.to_string(),
+            description: description.to_string(),
+        }
+    }
+}
+
 // TODO: Rewrite tasks in struct
 pub struct App {
-    pub tasks: Vec<(String, String)>,
+    pub tasks: Vec<Task>,
     pub task_under_cursor: usize,
     pub is_popup_active: bool,
     pub exit: bool,
@@ -20,19 +34,19 @@ impl App {
     pub fn new() -> App {
         App {
             tasks: vec![
-                (
-                    "Привет, мир!".to_string(),
-                    "В этой задаче Вам предстоит создать новый Git репозиторий и сделать в нём первый коммит.".to_string(),
+                Task::new(
+                    " Привет, мир! ",
+                    "В этой задаче Вам предстоит создать новый Git репозиторий и сделать в нём первый коммит.",
                 ),
-                (
-                    "Своих не сдаём!".to_string(),
+                Task::new(
+                    "Своих не сдаём!",
                     // TODO: Shorten the string
-                    "Последний коммит в этой задаче посеял в коде критический баг. Вам нужно исправить этот баг, не создавая нового коммита.".to_string(),
+                    "Последний коммит в этой задаче посеял в коде критический баг. Вам нужно исправить этот баг, не создавая нового коммита.",
                 ),
-                (
-                "Ещё какое-то там задание".to_string(),
-                "Надо двери в котельную замерить".to_string()
-            )
+                Task::new(
+                    "Ещё какое-то там задание",
+                    "Надо двери в котельную замерить",
+                ),
             ],
             exit: false,
             is_popup_active: false,

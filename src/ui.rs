@@ -13,16 +13,16 @@ pub fn ui(frame: &mut Frame, app: &App) {
     let title = Line::from("git-trainer v0.0.1".bold()).centered();
     let mut lines_of_tasks = Vec::new();
     let mut active_description = Line::from("aboba".to_owned());
-    for (i, (task, description)) in app.tasks.iter().enumerate() {
+    for (i, task) in app.tasks.iter().enumerate() {
         let line: Line;
         if app.task_under_cursor == i {
-            line = Line::from(task.clone())
+            line = Line::from(task.name.clone())
                 .left_aligned()
                 .style(Style::default().bg(Color::White))
                 .fg(Color::Black);
-            active_description = Line::from(description.to_owned()).left_aligned();
+            active_description = Line::from(task.description.clone()).left_aligned();
         } else {
-            line = Line::from(task.clone()).left_aligned();
+            line = Line::from(task.name.clone()).left_aligned();
         }
 
         lines_of_tasks.push(line);
