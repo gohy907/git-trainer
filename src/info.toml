@@ -11,7 +11,13 @@ desc = """
 """
 work_name = "hello-world"
 dir = "basics"
-in_progress = false
-done = false
-pending = false 
-approved = false 
+status = "in_progress"
+
+[[tasks]]
+name = "Абоба"
+desc = """
+a
+"""
+work_name="ab"
+dir="a"
+status="approved"

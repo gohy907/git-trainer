@@ -1,5 +1,5 @@
 use crate::Frame;
-use crate::app::App;
+use crate::app::{App, Status};
 use ratatui::layout::{Alignment, Flex};
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use ratatui::style::Color;
@@ -11,7 +11,6 @@ use ratatui::{
 
 pub fn ui(frame: &mut Frame, app: &App) {
     let title = Line::from("git-trainer v0.0.1".bold()).centered();
-    let mut lines_of_tasks = Vec::new();
 
     let active_description = app
         .config
@@ -22,6 +21,8 @@ pub fn ui(frame: &mut Frame, app: &App) {
             (app.task_under_cursor == i).then(|| Line::from(task.desc.clone()).left_aligned())
         })
         .expect("Active task must exist");
+
+    let mut lines_of_tasks = Vec::new();
 
     for (i, task) in app.config.tasks.iter().enumerate() {
         let line = if app.task_under_cursor == i {
@@ -36,7 +37,21 @@ pub fn ui(frame: &mut Frame, app: &App) {
         lines_of_tasks.push(line);
     }
 
-    let outer_layout = Layout::default()
+    let mut lines_of_statuses = Vec::new();
+    for task in &app.config.tasks {
+        let status = task.status;
+        let status_str = match status {
+            Status::NotInProgress => "НЕ НАЧАТО",
+            Status::InProgress => "НАЧАТО",
+            Status::Done => "СДЕЛАНО",
+            Status::Pending => "ОТПРАВЛЕНО",
+            Status::Approved => "ОЦЕНЕНО",
+        };
+        let line = Line::from(status_str);
+        lines_of_statuses.push(line);
+    }
+
+    let global_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
@@ -45,14 +60,23 @@ pub fn ui(frame: &mut Frame, app: &App) {
         ])
         .split(frame.area());
 
-    let inner_layout = Layout::default()
+    let main_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(outer_layout[1]);
+        .split(global_layout[1]);
+
+    let task_list_layout = main_layout[0];
+
+    let [list, status] =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .areas(task_list_layout);
 
     let tasks_paragraph = Paragraph::new(lines_of_tasks)
         .centered()
         .block(Block::bordered().title("Задания"));
+    let statuses_paragraph = Paragraph::new(lines_of_statuses)
+        .centered()
+        .block(Block::bordered().title("Состояния"));
 
     let description_paragraph = Paragraph::new(active_description)
         .centered()
@@ -62,10 +86,11 @@ pub fn ui(frame: &mut Frame, app: &App) {
     let how_to_use_string = "← ↑ ↓ → для перемещения, q для выхода".to_string();
     let how_to_use = Paragraph::new(how_to_use_string).centered();
 
-    frame.render_widget(how_to_use, outer_layout[2]);
-    frame.render_widget(title, outer_layout[0]);
-    frame.render_widget(tasks_paragraph, inner_layout[0]);
-    frame.render_widget(description_paragraph, inner_layout[1]);
+    frame.render_widget(how_to_use, global_layout[2]);
+    frame.render_widget(title, global_layout[0]);
+    frame.render_widget(tasks_paragraph, list);
+    frame.render_widget(statuses_paragraph, status);
+    frame.render_widget(description_paragraph, main_layout[1]);
 
     if app.is_popup_active {
         let lines_of_popup = vec![

@@ -10,7 +10,7 @@ use crossterm::event::KeyEventKind;
 use std::fs;
 use toml::de::Error;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -25,14 +25,21 @@ pub struct Task {
     pub desc: String,
     pub work_name: String,
     pub dir: String,
-    pub in_progress: bool,
-    pub done: bool,
-    pub pending: bool,
-    pub approved: bool,
+    pub status: Status,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")] // "in_progress", "done", ...
+pub enum Status {
+    NotInProgress,
+    InProgress,
+    Done,
+    Pending,
+    Approved,
 }
 
 fn load_config(path: &str) -> Result<Config, Error> {
-    let text = fs::read_to_string(path).expect("failed to read config by path");
+    let text = fs::read_to_string(path).expect("failed to read config");
     toml::from_str::<Config>(&text)
 }
 
@@ -51,7 +58,7 @@ impl App {
             config: {
                 #[cfg(debug_assertions)]
                 {
-                    load_config("src/info.toml").unwrap()
+                    load_config("src/info.toml").expect("failed to load config")
                 }
 
                 #[cfg(not(debug_assertions))]
@@ -114,9 +121,9 @@ impl App {
     }
 
     fn move_cursor_down(&mut self) {
-        // if self.task_under_cursor != self.tasks.len() - 1 {
-        //     self.task_under_cursor += 1;
-        // }
+        if self.task_under_cursor != self.config.tasks.len() - 1 {
+            self.task_under_cursor += 1;
+        }
     }
 
     fn exit(&mut self) {
