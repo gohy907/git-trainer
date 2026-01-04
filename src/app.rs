@@ -12,7 +12,6 @@ use std::fs;
 use toml::de::Error;
 
 use serde::{Deserialize, Serialize};
-
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub first_time: bool,
@@ -20,7 +19,7 @@ pub struct Config {
     pub tasks: Vec<Task>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Task {
     pub name: String,
     pub desc: String,
@@ -52,7 +51,7 @@ pub struct App {
     pub task_under_cursor: usize,
     pub is_popup_active: bool,
     pub exit: bool,
-    pub task_to_run: Option<String>,
+    pub task_to_run: Option<Task>,
 }
 
 impl App {
@@ -108,6 +107,7 @@ impl App {
                 if self.is_popup_active {
                     self.exit();
                     self.is_popup_active = false;
+                    self.task_to_run = Some(self.config.tasks[self.task_under_cursor].clone());
                 } else {
                     self.is_popup_active = true;
                 }
@@ -137,23 +137,6 @@ impl App {
         };
         self.table_state.select(Some(i));
         self.task_under_cursor = i;
-    }
-    pub fn next_column(&mut self) {
-        self.table_state.select_next_column();
-    }
-    pub fn previous_column(&mut self) {
-        self.table_state.select_previous_column();
-    }
-    fn move_cursor_up(&mut self) {
-        if self.task_under_cursor != 0 {
-            self.task_under_cursor -= 1;
-        }
-    }
-
-    fn move_cursor_down(&mut self) {
-        if self.task_under_cursor != self.config.tasks.len() - 1 {
-            self.task_under_cursor += 1;
-        }
     }
 
     fn exit(&mut self) {

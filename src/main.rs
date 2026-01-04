@@ -2,7 +2,7 @@ mod app;
 mod docker;
 mod ui;
 use crate::app::App;
-use crate::docker::run_interactive;
+use crate::docker::{build_task_image, create_task_container, run_interactive};
 use crate::ui::ui;
 use ratatui::prelude::Backend;
 use ratatui::{Frame, Terminal};
@@ -18,7 +18,19 @@ async fn run() -> bool {
     ratatui::restore();
 
     if let Some(task) = app.task_to_run {
-        run_interactive(&task);
+        match build_task_image(&task).await {
+            Err(err) => eprintln!("{err}"),
+            _ => {}
+        };
+        match create_task_container(&task).await {
+            Err(err) => eprintln!("{err}"),
+            Ok(ok) => println!("{ok}"),
+        };
+
+        match run_interactive(&task) {
+            Err(err) => eprintln!("{err}"),
+            _ => {}
+        };
         return true;
     }
     false
