@@ -1,33 +1,44 @@
 use crate::Backend;
 use crate::Terminal;
 use crate::app::event::Event;
-use crate::docker;
 use crate::io;
 use crate::ui;
 use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
+use std::fs;
+use toml::de::Error;
 
-pub struct Task {
-    pub name: String,
-    pub internal_name: String,
-    pub description: String,
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+pub struct Config {
+    pub first_time: bool,
+    pub first_time_desc: String,
+    pub tasks: Vec<Task>,
 }
 
-impl Task {
-    pub fn new(name: &str, internal_name: &str, description: &str) -> Task {
-        Task {
-            name: name.to_string(),
-            internal_name: internal_name.to_string(),
-            description: description.to_string(),
-        }
-    }
+#[derive(Debug, Deserialize)]
+pub struct Task {
+    pub name: String,
+    pub desc: String,
+    pub work_name: String,
+    pub dir: String,
+    pub in_progress: bool,
+    pub done: bool,
+    pub pending: bool,
+    pub approved: bool,
+}
+
+fn load_config(path: &str) -> Result<Config, Error> {
+    let text = fs::read_to_string(path).expect("failed to read config");
+    toml::from_str::<Config>(&text)
 }
 
 // TODO: Rewrite tasks in struct
 pub struct App {
-    pub tasks: Vec<Task>,
+    pub config: Config,
     pub task_under_cursor: usize,
     pub is_popup_active: bool,
     pub exit: bool,
@@ -37,25 +48,17 @@ pub struct App {
 impl App {
     pub fn new() -> App {
         App {
-            tasks: vec![
-                Task::new(
-                    "Привет, мир!",
-                    "task-1",
-                    "В этой задаче Вам предстоит создать новый Git репозиторий \
-                    и сделать в нём первый коммит.",
-                ),
-                Task::new(
-                    "Своих не сдаём!",
-                    "task-2",
-                    "Последний коммит в этой задаче посеял в коде критический баг. \
-                     Вам нужно исправить этот баг, не создавая нового коммита.",
-                ),
-                Task::new(
-                    "Ещё какое-то там задание",
-                    "task-3",
-                    "Надо двери в котельную замерить",
-                ),
-            ],
+            config: {
+                #[cfg(debug_assertions)]
+                {
+                    load_config("info.toml").unwrap()
+                }
+
+                #[cfg(not(debug_assertions))]
+                {
+                    load_config("info.toml").unwrap()
+                }
+            },
             exit: false,
             is_popup_active: false,
             task_under_cursor: 0,
@@ -90,8 +93,6 @@ impl App {
             KeyCode::Down => self.move_cursor_down(),
             KeyCode::Enter => {
                 if self.is_popup_active {
-                    self.task_to_run =
-                        Some(self.tasks[self.task_under_cursor].internal_name.clone());
                     self.exit();
                     self.is_popup_active = false;
                 } else {
@@ -113,9 +114,9 @@ impl App {
     }
 
     fn move_cursor_down(&mut self) {
-        if self.task_under_cursor != self.tasks.len() - 1 {
-            self.task_under_cursor += 1;
-        }
+        // if self.task_under_cursor != self.tasks.len() - 1 {
+        //     self.task_under_cursor += 1;
+        // }
     }
 
     fn exit(&mut self) {

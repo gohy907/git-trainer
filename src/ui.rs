@@ -14,16 +14,16 @@ pub fn ui(frame: &mut Frame, app: &App) {
     let mut lines_of_tasks = Vec::new();
 
     let active_description = app
+        .config
         .tasks
         .iter()
         .enumerate()
         .find_map(|(i, task)| {
-            (app.task_under_cursor == i)
-                .then(|| Line::from(task.description.clone()).left_aligned())
+            (app.task_under_cursor == i).then(|| Line::from(task.desc.clone()).left_aligned())
         })
         .expect("Active task must exist");
 
-    for (i, task) in app.tasks.iter().enumerate() {
+    for (i, task) in app.config.tasks.iter().enumerate() {
         let line = if app.task_under_cursor == i {
             Line::from(task.name.clone())
                 .left_aligned()

@@ -1,0 +1,3 @@
+[submodule "tasks/basics/hello-world"]
+	path = tasks/basics/hello-world
+	url = git@github.com:git-trainer-tasks/hello-world.git

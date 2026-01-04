@@ -1,0 +1,17 @@
+first_time = true 
+first_time_desc = """
+Тут была абоба.
+"""
+
+[[tasks]]
+name = "Привет, мир!"
+desc = """
+В этой задаче Вам предстоит создать новый Git репозиторий
+и сделать в нём первый коммит.
+"""
+work_name = "hello-world"
+dir = "basics"
+in_progress = false
+done = false
+pending = false 
+approved = false 
