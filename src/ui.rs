@@ -5,21 +5,102 @@ use ratatui::layout::{Alignment, Flex};
 use ratatui::prelude::{Direction, Layout, Rect};
 use ratatui::style::Color;
 use ratatui::style::palette::tailwind;
-use ratatui::style::{Style, Stylize};
+use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::widgets::{Block, Cell, Row, Table};
 use ratatui::{
     text::{Line, Text},
     widgets::{Clear, Paragraph, Wrap},
 };
 
+const LINE_WIDTH: u16 = 50;
+
+fn wrap(text: &str, width: usize, max_lines: usize) -> String {
+    if width == 0 || max_lines == 0 {
+        return String::new();
+    }
+
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    let mut current_len = 0;
+
+    for word in text.split_whitespace() {
+        let word_len = word.chars().count();
+
+        if word_len > width {
+            if !current.is_empty() {
+                lines.push(current);
+                current = String::new();
+                current_len = 0;
+                if lines.len() == max_lines {
+                    break;
+                }
+            }
+
+            let mut buf = String::new();
+            let mut len = 0usize;
+            for ch in word.chars() {
+                if len == width {
+                    lines.push(buf);
+                    buf = String::new();
+                    len = 0;
+                    if lines.len() == max_lines {
+                        break;
+                    }
+                }
+                buf.push(ch);
+                len += 1;
+            }
+            if lines.len() == max_lines {
+                break;
+            }
+            if !buf.is_empty() {
+                current = buf;
+                current_len = len;
+            }
+            continue;
+        }
+
+        let extra = if current.is_empty() {
+            word_len
+        } else {
+            1 + word_len
+        };
+        if current_len + extra > width {
+            if !current.is_empty() {
+                lines.push(current);
+                if lines.len() == max_lines {
+                    return lines.join("\n");
+                }
+            }
+            current = word.to_string();
+            current_len = word_len;
+        } else {
+            if !current.is_empty() {
+                current.push(' ');
+                current_len += 1;
+            }
+            current.push_str(word);
+            current_len += word_len;
+        }
+    }
+
+    if !current.is_empty() && lines.len() < max_lines {
+        lines.push(current);
+    }
+
+    lines.join("\n")
+}
+
 pub struct TableColors {
-    pub normal_row_color: Color,
-    pub alt_row_color: Color,
+    normal_row_color: Color,
+    alt_row_color: Color,
+    selected_row_style_fg: Color,
 }
 
 impl TableColors {
     pub fn new() -> TableColors {
         TableColors {
+            selected_row_style_fg: tailwind::BLUE.c400,
             normal_row_color: tailwind::SLATE.c950,
             alt_row_color: tailwind::SLATE.c900,
         }
@@ -29,70 +110,29 @@ impl TableColors {
 fn get_max_task_name_length(app: &App) -> usize {
     let mut max = usize::min_value();
     for task in &app.config.tasks {
-        if task.name.len() > max {
-            max = task.name.len();
+        if task.name.chars().count() > max {
+            max = task.name.chars().count();
         }
     }
     max
 }
 
-fn get_max_task_desc_length(app: &App) -> usize {
-    let mut max = usize::min_value();
-    for task in &app.config.tasks {
-        if task.desc.len() > max {
-            max = task.desc.len();
-        }
-    }
-    usize::min(57, max)
-}
-
-fn render_table(frame: &mut Frame, rect: Rect, app: &App) {
-    // Чтобы красить каждую клетку по отдельности надо их все иметь как набор Cell-ов
-    // Но тогда не получится единый фон на все клетки в ряду поставить, они будут с пустым
-    // промежутком
-    // Так что здесь я два раза рендерю таблицу - сначала без текста, но с фоном,
-    // а потом текст поверх фона
-    // Лютейший костыль, но работает
+fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
     let max_task_name_length = get_max_task_name_length(app) as u16;
-    let max_task_desc_length = get_max_task_desc_length(app) as u16;
     let colors = TableColors::new();
 
-    let header = [""].into_iter().map(Cell::from).collect::<Row>().height(1);
-    let rows_without_text = app.config.tasks.iter().enumerate().map(|(i, _)| {
-        let color = match i % 2 {
+    let header = ["Название", "Описание", "Статус"]
+        .into_iter()
+        .map(Cell::from)
+        .collect::<Row>()
+        .height(1);
+
+    let rows = app.config.tasks.iter().enumerate().map(|(i, data)| {
+        let row_bg = match i % 2 {
             0 => colors.normal_row_color,
             _ => colors.alt_row_color,
         };
 
-        [""].into_iter()
-            .collect::<Row>()
-            .style(Style::new().bg(color))
-            .height(4)
-    });
-
-    let bar = ">>";
-    let t = Table::new(
-        rows_without_text,
-        [
-            Constraint::Length(max_task_name_length + 5),
-            Constraint::Length(max_task_desc_length + 5),
-            Constraint::Min(2),
-        ],
-    )
-    .header(header)
-    // .row_highlight_style(selected_row_style)
-    // .column_highlight_style(selected_col_style)
-    // .cell_highlight_style(selected_cell_style)
-    .highlight_symbol(Text::from(vec![
-        "".into(),
-        bar.into(),
-        bar.into(),
-        "".into(),
-    ]));
-
-    frame.render_widget(t, rect);
-
-    let rows = app.config.tasks.iter().enumerate().map(|(_, data)| {
         let status_str = match data.status {
             Status::NotInProgress => "НЕ НАЧАТО",
             Status::InProgress => "НАЧАТО",
@@ -101,10 +141,14 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &App) {
             Status::Approved => "ОЦЕНЕНО",
         };
 
-        let item = [data.name.clone(), data.desc.clone(), status_str.to_string()];
+        let cell_height = 4;
+
+        let wrapped_desc = wrap(&data.desc, LINE_WIDTH as usize, cell_height);
+        let item = [data.name.clone(), wrapped_desc, status_str.to_string()];
 
         let cells = item.into_iter().enumerate().map(|(col, content)| {
-            let base = Cell::from(Text::from(content)).style(Style::new().fg(Color::White));
+            let mut cell =
+                Cell::from(Text::from(content)).style(Style::new().fg(Color::White).bg(row_bg));
 
             if col == 2 {
                 let status_color = match data.status {
@@ -115,33 +159,30 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &App) {
                     Status::Approved => Color::LightGreen,
                 };
 
-                base.style(Style::new().fg(status_color))
-            } else {
-                base
+                cell = cell.style(Style::new().fg(status_color).bg(row_bg));
             }
+
+            cell
         });
 
-        Row::new(cells).height(4)
+        Row::new(cells).height(4).style(Style::new().bg(row_bg))
     });
 
-    let header = ["Название", "Описание", "Статус"]
-        .into_iter()
-        .map(Cell::from)
-        .collect::<Row>()
-        .height(1);
     let bar = ">>";
+    let selected_row_style = Style::default()
+        .add_modifier(Modifier::REVERSED)
+        .fg(colors.selected_row_style_fg);
+
     let t = Table::new(
         rows,
         [
-            Constraint::Length(max_task_name_length + 5),
-            Constraint::Length(max_task_desc_length + 5),
-            Constraint::Min(2),
+            Constraint::Min(max_task_name_length),
+            Constraint::Min(LINE_WIDTH),
+            Constraint::Min(10),
         ],
     )
     .header(header)
-    // .row_highlight_style(selected_row_style)
-    // .column_highlight_style(selected_col_style)
-    // .cell_highlight_style(selected_cell_style)
+    .row_highlight_style(selected_row_style)
     .highlight_symbol(Text::from(vec![
         "".into(),
         bar.into(),
@@ -149,50 +190,11 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &App) {
         "".into(),
     ]));
 
-    frame.render_widget(t, rect);
+    frame.render_stateful_widget(t, rect, &mut app.table_state);
 }
 
-pub fn ui(frame: &mut Frame, app: &App) {
+pub fn ui(frame: &mut Frame, app: &mut App) {
     let title = Line::from("git-trainer v0.0.1".bold()).centered();
-
-    let active_description = app
-        .config
-        .tasks
-        .iter()
-        .enumerate()
-        .find_map(|(i, task)| {
-            (app.task_under_cursor == i).then(|| Line::from(task.desc.clone()).left_aligned())
-        })
-        .expect("Active task must exist");
-
-    let mut lines_of_tasks = Vec::new();
-
-    for (i, task) in app.config.tasks.iter().enumerate() {
-        let line = if app.task_under_cursor == i {
-            Line::from(task.name.clone())
-                .left_aligned()
-                .style(Style::default().bg(Color::White))
-                .fg(Color::Black)
-        } else {
-            Line::from(task.name.clone()).left_aligned()
-        };
-
-        lines_of_tasks.push(line);
-    }
-
-    let mut lines_of_statuses = Vec::new();
-    for task in &app.config.tasks {
-        let status = task.status;
-        let status_str = match status {
-            Status::NotInProgress => "НЕ НАЧАТО",
-            Status::InProgress => "НАЧАТО",
-            Status::Done => "СДЕЛАНО",
-            Status::Pending => "ОТПРАВЛЕНО",
-            Status::Approved => "ОЦЕНЕНО",
-        };
-        let line = Line::from(status_str);
-        lines_of_statuses.push(line);
-    }
 
     let global_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -203,87 +205,11 @@ pub fn ui(frame: &mut Frame, app: &App) {
         ])
         .split(frame.area());
 
-    // .bg(self.colors.buffer_bg)
-    // .highlight_spacing(HighlightSpacing::Always);
-    // let table = Table::new(rows, widths)
-    //     // ...and they can be separated by a fixed spacing.
-    //     .column_spacing(1)
-    //     // You can set the style of the entire Table.
-    //     .style(Style::new().blue())
-    //     // It has an optional header, which is simply a Row always visible at the top.
-    //     .header(
-    //         Row::new(vec!["Название", "Состояние", "Описание"])
-    //             .style(Style::new().bold())
-    //             // To add space between the header and the rest of the rows, specify the margin
-    //             .bottom_margin(1),
-    //     )
-    //     // It has an optional footer, which is simply a Row always visible at the bottom.
-    //     .footer(Row::new(vec!["Updated on Dec 28"]))
-    //     // As any other widget, a Table can be wrapped in a Block.
-    //     .block(Block::new().title("Задания"))
-    //     // The selected row, column, cell and its content can also be styled.
-    //     .row_highlight_style(Style::new().reversed())
-    //     .column_highlight_style(Style::new().red())
-    //     .cell_highlight_style(Style::new().blue())
-    //     // ...and potentially show a symbol in front of the selection.
-    //     .highlight_symbol(">>");
-    //
-    // let main_layout = Layout::default()
-    //     .direction(Direction::Horizontal)
-    //     // .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-    //     .split(global_layout[1]);
-
-    // let task_list_layout = main_layout[0];
-
-    // let [list, status] =
-    //     Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
-    //         .areas(task_list_layout);
-
-    let tasks_paragraph = Paragraph::new(lines_of_tasks)
-        .centered()
-        .block(Block::bordered().title("Задания"));
-    let statuses_paragraph = Paragraph::new(lines_of_statuses)
-        .centered()
-        .block(Block::bordered().title("Состояния"));
-
-    let description_paragraph = Paragraph::new(active_description)
-        .centered()
-        .block(Block::bordered().title("Описание"))
-        .wrap(Wrap { trim: true });
-
     let how_to_use_string = "← ↑ ↓ → для перемещения, q для выхода".to_string();
     let how_to_use = Paragraph::new(how_to_use_string).centered();
 
     frame.render_widget(how_to_use, global_layout[2]);
     frame.render_widget(title, global_layout[0]);
-
-    // let header = ["Название", "Описание", "Статус"]
-    //     .into_iter()
-    //     .map(Cell::from)
-    //     .collect::<Row>()
-    //     .height(1);
-    // let t = Table::new(
-    //     rows_1,
-    //     [
-    //         // + 1 is for padding.
-    //         Constraint::Min(10 + 1),
-    //         Constraint::Min(1 + 1),
-    //         Constraint::Min(2),
-    //     ],
-    // )
-    // .header(header)
-    // // .row_highlight_style(selected_row_style)
-    // // .column_highlight_style(selected_col_style)
-    // // .cell_highlight_style(selected_cell_style)
-    // .highlight_symbol(Text::from(vec![
-    //     "".into(),
-    //     bar.into(),
-    //     bar.into(),
-    //     "".into(),
-    // ]));
-    //
-    // frame.render_widget(statuses_paragraph, status);
-    // frame.render_widget(description_paragraph, main_layout[1]);
 
     render_table(frame, global_layout[1], app);
     if app.is_popup_active {

@@ -7,6 +7,7 @@ use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
+use ratatui::widgets::TableState;
 use std::fs;
 use toml::de::Error;
 
@@ -45,6 +46,7 @@ fn load_config(path: &str) -> Result<Config, Error> {
 
 // TODO: Rewrite tasks in struct
 pub struct App {
+    pub table_state: TableState,
     pub config: Config,
     pub task_under_cursor: usize,
     pub is_popup_active: bool,
@@ -54,7 +56,10 @@ pub struct App {
 
 impl App {
     pub fn new() -> App {
+        let mut table_state = TableState::default();
+        table_state.select(Some(0)); // стартуем с первой строки
         App {
+            table_state: table_state,
             config: {
                 #[cfg(debug_assertions)]
                 {
@@ -75,7 +80,7 @@ impl App {
 
     pub fn run_app<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
         while !self.exit {
-            terminal.draw(|f| ui(f, &self))?;
+            terminal.draw(|f| ui(f, self))?;
             self.handle_events()?;
         }
         Ok(())
@@ -96,8 +101,8 @@ impl App {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
-            KeyCode::Up => self.move_cursor_up(),
-            KeyCode::Down => self.move_cursor_down(),
+            KeyCode::Up => self.previous_row(),
+            KeyCode::Down => self.next_row(),
             KeyCode::Enter => {
                 if self.is_popup_active {
                     self.exit();
@@ -114,6 +119,30 @@ impl App {
         }
     }
 
+    pub fn next_row(&mut self) {
+        let i = match self.table_state.selected() {
+            Some(i) if i + 1 < self.config.tasks.len() => i + 1,
+            _ => 0,
+        };
+        self.table_state.select(Some(i));
+        self.task_under_cursor = i; // если нужно синхронизировать с описанием
+    }
+
+    pub fn previous_row(&mut self) {
+        let len = self.config.tasks.len();
+        let i = match self.table_state.selected() {
+            Some(0) | None => len - 1,
+            Some(i) => i - 1,
+        };
+        self.table_state.select(Some(i));
+        self.task_under_cursor = i;
+    }
+    pub fn next_column(&mut self) {
+        self.table_state.select_next_column();
+    }
+    pub fn previous_column(&mut self) {
+        self.table_state.select_previous_column();
+    }
     fn move_cursor_up(&mut self) {
         if self.task_under_cursor != 0 {
             self.task_under_cursor -= 1;
