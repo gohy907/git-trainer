@@ -32,7 +32,7 @@ pub struct Task {
 }
 
 fn load_config(path: &str) -> Result<Config, Error> {
-    let text = fs::read_to_string(path).expect("failed to read config");
+    let text = fs::read_to_string(path).expect("failed to read config by path");
     toml::from_str::<Config>(&text)
 }
 
@@ -51,12 +51,12 @@ impl App {
             config: {
                 #[cfg(debug_assertions)]
                 {
-                    load_config("info.toml").unwrap()
+                    load_config("src/info.toml").unwrap()
                 }
 
                 #[cfg(not(debug_assertions))]
                 {
-                    load_config("info.toml").unwrap()
+                    load_config("/etc/git-trainer/info.toml").unwrap()
                 }
             },
             exit: false,
