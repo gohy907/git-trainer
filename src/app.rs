@@ -27,6 +27,7 @@ pub struct Task {
     pub work_name: String,
     pub dir: String,
     pub status: Status,
+    pub grade: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

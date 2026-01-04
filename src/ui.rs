@@ -121,7 +121,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
     let max_task_name_length = get_max_task_name_length(app) as u16;
     let colors = TableColors::new();
 
-    let header = ["Название", "Описание", "Статус"]
+    let header = ["Название", "Описание", "Статус", "Оценка"]
         .into_iter()
         .map(Cell::from)
         .collect::<Row>()
@@ -144,7 +144,15 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
         let cell_height = 4;
 
         let wrapped_desc = wrap(&data.desc, LINE_WIDTH as usize, cell_height);
-        let item = [data.name.clone(), wrapped_desc, status_str.to_string()];
+        let item = [
+            data.name.clone(),
+            wrapped_desc,
+            status_str.to_string(),
+            match data.grade {
+                Some(grade) => format!("{}/100", grade.to_string()),
+                None => "Нет оценки".to_string(),
+            },
+        ];
 
         let cells = item.into_iter().enumerate().map(|(col, content)| {
             let mut cell =
@@ -179,6 +187,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
             Constraint::Min(max_task_name_length),
             Constraint::Min(LINE_WIDTH),
             Constraint::Min(10),
+            Constraint::Min(14),
         ],
     )
     .header(header)
@@ -194,7 +203,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
 }
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
-    let title = Line::from("git-trainer v0.0.1".bold()).centered();
+    let title = Line::from("git-trainer v0.0.2".bold()).centered();
 
     let global_layout = Layout::default()
         .direction(Direction::Vertical)

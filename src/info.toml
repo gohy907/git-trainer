@@ -21,3 +21,31 @@ a
 work_name="ab"
 dir="a"
 status="approved"
+grade = 5
+
+[[tasks]]
+name = "Абоба"
+desc = """
+a
+"""
+work_name="ab"
+dir="a"
+status="pending"
+
+[[tasks]]
+name = "Абоба"
+desc = """
+a
+"""
+work_name="ab"
+dir="a"
+status="done"
+
+[[tasks]]
+name = "Абоба"
+desc = """
+a
+"""
+work_name="ab"
+dir="a"
+status="not_in_progress"
