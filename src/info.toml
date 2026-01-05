@@ -1,4 +1,4 @@
-first_time = true 
+first_time = true
 first_time_desc = """
 Тут была абоба.
 """
@@ -18,9 +18,9 @@ name = "Абоба"
 desc = """
 a
 """
-work_name="ab"
-dir="a"
-status="approved"
+work_name = "ab"
+dir = "a"
+status = "approved"
 grade = 5
 
 [[tasks]]
@@ -28,24 +28,24 @@ name = "Абоба"
 desc = """
 a
 """
-work_name="ab"
-dir="a"
-status="pending"
+work_name = "ab"
+dir = "a"
+status = "pending"
 
 [[tasks]]
 name = "Абоба"
 desc = """
 a
 """
-work_name="ab"
-dir="a"
-status="done"
+work_name = "ab"
+dir = "a"
+status = "done"
 
 [[tasks]]
 name = "Абоба"
 desc = """
 a
 """
-work_name="ab"
-dir="a"
-status="not_in_progress"
+work_name = "ab"
+dir = "a"
+status = "not_in_progress"

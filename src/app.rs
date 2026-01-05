@@ -9,17 +9,18 @@ use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use ratatui::widgets::TableState;
 use std::fs;
+use thiserror::Error;
 use toml::de::Error;
 
 use serde::{Deserialize, Serialize};
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     pub first_time: bool,
     pub first_time_desc: String,
     pub tasks: Vec<Task>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Task {
     pub name: String,
     pub desc: String,
@@ -29,7 +30,7 @@ pub struct Task {
     pub grade: Option<usize>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")] // "in_progress", "done", ...
 pub enum Status {
     NotInProgress,
@@ -39,9 +40,26 @@ pub enum Status {
     Approved,
 }
 
-fn load_config(path: &str) -> Result<Config, Error> {
-    let text = fs::read_to_string(path).expect("failed to read config");
-    toml::from_str::<Config>(&text)
+#[derive(Debug, Error)]
+pub enum SaveConfigError {
+    #[error("Serializing to TOML error: {0}")]
+    DockerConnection(#[from] toml::ser::Error),
+
+    #[error("IO error: {0}")]
+    IOError(#[from] io::Error),
+}
+
+impl Config {
+    pub fn load_config(path: &str) -> Result<Self, Error> {
+        let text = fs::read_to_string(path).expect("failed to read config");
+        toml::from_str::<Config>(&text)
+    }
+
+    pub fn save_config(&self) -> Result<(), SaveConfigError> {
+        let toml_str = toml::to_string_pretty(&self)?;
+        fs::write(INFO_PATH, toml_str)?;
+        Ok(())
+    }
 }
 
 // TODO: Rewrite tasks in struct
@@ -50,9 +68,15 @@ pub struct App {
     pub config: Config,
     pub task_under_cursor: usize,
     pub is_popup_active: bool,
+    pub run_task: bool,
     pub exit: bool,
-    pub task_to_run: Option<Task>,
 }
+
+#[cfg(debug_assertions)]
+const INFO_PATH: &str = "src/info.toml";
+
+#[cfg(not(debug_assertions))]
+const INFO_PATH: &str = "/etc/git-trainer/info.toml";
 
 impl App {
     pub fn new() -> App {
@@ -60,21 +84,11 @@ impl App {
         table_state.select(Some(0)); // стартуем с первой строки
         App {
             table_state: table_state,
-            config: {
-                #[cfg(debug_assertions)]
-                {
-                    load_config("src/info.toml").expect("failed to load config")
-                }
-
-                #[cfg(not(debug_assertions))]
-                {
-                    load_config("/etc/git-trainer/info.toml").unwrap()
-                }
-            },
-            exit: false,
+            config: { Config::load_config(INFO_PATH).expect("failed to load config") },
             is_popup_active: false,
             task_under_cursor: 0,
-            task_to_run: None,
+            run_task: false,
+            exit: false,
         }
     }
 
@@ -107,7 +121,7 @@ impl App {
                 if self.is_popup_active {
                     self.exit();
                     self.is_popup_active = false;
-                    self.task_to_run = Some(self.config.tasks[self.task_under_cursor].clone());
+                    self.run_task = true;
                 } else {
                     self.is_popup_active = true;
                 }
