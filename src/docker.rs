@@ -9,9 +9,11 @@ use bollard::query_parameters::{
 };
 use futures_util::StreamExt;
 use nix::unistd::getuid;
+use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+use thiserror::Error;
 use tokio::io;
 
 fn tasks_root() -> PathBuf {
@@ -70,10 +72,6 @@ pub async fn create_task_container(task: &Task) -> Result<String, Error> {
 
     Ok(created.id)
 }
-
-use thiserror::Error;
-
-use std::env;
 
 #[derive(Debug, Error)]
 pub enum BuildError {
