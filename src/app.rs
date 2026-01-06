@@ -26,18 +26,26 @@ pub struct Task {
     pub desc: String,
     pub work_name: String,
     pub dir: String,
-    pub status: Status,
+    pub status: TaskStatus,
     pub grade: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")] // "in_progress", "done", ...
-pub enum Status {
+pub enum TaskStatus {
     NotInProgress,
     InProgress,
     Done,
     Pending,
     Approved,
+}
+
+#[derive(PartialEq)]
+pub enum AppStatus {
+    Idling,
+    RunningTask,
+    RestartingTask,
+    Exiting,
 }
 
 #[derive(Debug, Error)]
@@ -68,8 +76,7 @@ pub struct App {
     pub config: Config,
     pub task_under_cursor: usize,
     pub is_popup_active: bool,
-    pub task_to_run: Option<usize>,
-    pub exit: bool,
+    pub status: AppStatus,
 }
 
 #[cfg(debug_assertions)]
@@ -87,13 +94,12 @@ impl App {
             config: { Config::load_config(INFO_PATH).expect("failed to load config") },
             is_popup_active: false,
             task_under_cursor: 0,
-            task_to_run: None,
-            exit: false,
+            status: AppStatus::Idling,
         }
     }
 
     pub fn run_app<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
-        while !self.exit {
+        while self.status == AppStatus::Idling {
             terminal.draw(|f| ui(f, self))?;
             self.handle_events()?;
         }
@@ -121,10 +127,13 @@ impl App {
                 if self.is_popup_active {
                     self.exit();
                     self.is_popup_active = false;
-                    self.task_to_run = Some(self.task_under_cursor);
+                    self.status = AppStatus::RunningTask;
                 } else {
                     self.is_popup_active = true;
                 }
+            }
+            KeyCode::Char('r') => {
+                self.status = AppStatus::RestartingTask;
             }
 
             KeyCode::Esc => {
@@ -140,7 +149,7 @@ impl App {
             _ => 0,
         };
         self.table_state.select(Some(i));
-        self.task_under_cursor = i; // если нужно синхронизировать с описанием
+        self.task_under_cursor = i;
     }
 
     pub fn previous_row(&mut self) {
@@ -154,6 +163,6 @@ impl App {
     }
 
     fn exit(&mut self) {
-        self.exit = true;
+        self.status = AppStatus::Exiting;
     }
 }

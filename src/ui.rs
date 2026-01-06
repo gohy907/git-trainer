@@ -1,5 +1,6 @@
 use crate::Frame;
-use crate::app::{App, Status};
+use crate::TaskStatus;
+use crate::app::App;
 use ratatui::layout::Constraint;
 use ratatui::layout::{Alignment, Flex};
 use ratatui::prelude::{Direction, Layout, Rect};
@@ -134,11 +135,11 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
         };
 
         let status_str = match data.status {
-            Status::NotInProgress => "НЕ НАЧАТО",
-            Status::InProgress => "НАЧАТО",
-            Status::Done => "СДЕЛАНО",
-            Status::Pending => "ОТПРАВЛЕНО",
-            Status::Approved => "ОЦЕНЕНО",
+            TaskStatus::NotInProgress => "НЕ НАЧАТО",
+            TaskStatus::InProgress => "НАЧАТО",
+            TaskStatus::Done => "СДЕЛАНО",
+            TaskStatus::Pending => "ОТПРАВЛЕНО",
+            TaskStatus::Approved => "ОЦЕНЕНО",
         };
 
         let cell_height = 4;
@@ -160,11 +161,11 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
 
             if col == 2 {
                 let status_color = match data.status {
-                    Status::NotInProgress => Color::Red,
-                    Status::InProgress => Color::Yellow,
-                    Status::Done => Color::Blue,
-                    Status::Pending => Color::LightMagenta,
-                    Status::Approved => Color::LightGreen,
+                    TaskStatus::NotInProgress => Color::Red,
+                    TaskStatus::InProgress => Color::Yellow,
+                    TaskStatus::Done => Color::Blue,
+                    TaskStatus::Pending => Color::LightMagenta,
+                    TaskStatus::Approved => Color::LightGreen,
                 };
 
                 cell = cell.style(Style::new().fg(status_color).bg(row_bg));
