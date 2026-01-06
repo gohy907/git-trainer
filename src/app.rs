@@ -68,7 +68,7 @@ pub struct App {
     pub config: Config,
     pub task_under_cursor: usize,
     pub is_popup_active: bool,
-    pub run_task: bool,
+    pub task_to_run: Option<usize>,
     pub exit: bool,
 }
 
@@ -87,7 +87,7 @@ impl App {
             config: { Config::load_config(INFO_PATH).expect("failed to load config") },
             is_popup_active: false,
             task_under_cursor: 0,
-            run_task: false,
+            task_to_run: None,
             exit: false,
         }
     }
@@ -121,7 +121,7 @@ impl App {
                 if self.is_popup_active {
                     self.exit();
                     self.is_popup_active = false;
-                    self.run_task = true;
+                    self.task_to_run = Some(self.task_under_cursor);
                 } else {
                     self.is_popup_active = true;
                 }

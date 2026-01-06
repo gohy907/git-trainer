@@ -1,8 +1,8 @@
 mod app;
 mod docker;
 mod ui;
-use crate::app::{App, Config, Status};
-use crate::docker::{build_task_image, create_task_container, run_interactive};
+use crate::app::{App, Status};
+use crate::docker::{build_task_image, create_task_container, restart_task, run_interactive};
 use crate::ui::ui;
 use ratatui::prelude::Backend;
 use ratatui::{Frame, Terminal};
@@ -17,34 +17,36 @@ async fn run() -> bool {
 
     ratatui::restore();
 
-    if app.run_task {
-        let task = &mut app.config.tasks[app.task_under_cursor];
-        // ТОЛЬКО ДЛЯ РАЗРАБОТКИ, УБРАТЬ В ПРОДЕ К ЧЁРТОВОЙ МАТЕРИ
-        match build_task_image(&task).await {
-            Err(err) => eprintln!("{err}"),
-            _ => {}
-        };
-        match create_task_container(&task).await {
-            Err(err) => eprintln!("{err}"),
-            Ok(ok) => println!("{ok}"),
-        };
+    match app.task_to_run {
+        Some(task_index) => {
+            let task = &mut app.config.tasks[task_index];
+            // ТОЛЬКО ДЛЯ РАЗРАБОТКИ, УБРАТЬ В ПРОДЕ К ЧЁРТОВОЙ МАТЕРИ
+            match build_task_image(&task).await {
+                Err(err) => eprintln!("{err}"),
+                _ => {}
+            };
+            match create_task_container(&task).await {
+                Err(err) => eprintln!("{err}"),
+                _ => {}
+            };
 
-        if task.status == Status::NotInProgress {
-            task.status = Status::InProgress;
+            if task.status == Status::NotInProgress {
+                task.status = Status::InProgress;
+            }
+
+            match run_interactive(&task) {
+                Err(err) => eprintln!("{err}"),
+                _ => {}
+            };
+
+            match app.config.save_config() {
+                Err(err) => eprintln!("{err}"),
+                _ => {}
+            };
+            true
         }
-
-        match run_interactive(&task) {
-            Err(err) => eprintln!("{err}"),
-            _ => {}
-        };
-
-        match app.config.save_config() {
-            Err(err) => eprintln!("{err}"),
-            _ => {}
-        };
-        return true;
+        None => false,
     }
-    false
 }
 
 #[tokio::main]
