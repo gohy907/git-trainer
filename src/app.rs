@@ -1,6 +1,7 @@
 use crate::Backend;
 use crate::Terminal;
 use crate::app::event::Event;
+use crate::docker;
 use crate::io;
 use crate::ui;
 use crossterm::event;
@@ -98,10 +99,25 @@ impl App {
         }
     }
 
-    pub fn run_app<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
-        while self.status == AppStatus::Idling {
+    pub async fn run_app<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
+        while self.status != AppStatus::Exiting && self.status != AppStatus::RunningTask {
             terminal.draw(|f| ui(f, self))?;
             self.handle_events()?;
+            match self.status {
+                AppStatus::RestartingTask => {
+                    let task = &mut self.config.tasks[self.task_under_cursor];
+                    match docker::restart_task(task).await {
+                        Err(err) => {
+                            // ratatui::restore();
+                            eprintln!("Error while restarting task: {}", err);
+                        }
+
+                        _ => {}
+                    };
+                    self.status = AppStatus::Idling;
+                }
+                _ => {}
+            }
         }
         Ok(())
     }
@@ -125,7 +141,6 @@ impl App {
             KeyCode::Down => self.next_row(),
             KeyCode::Enter => {
                 if self.is_popup_active {
-                    self.exit();
                     self.is_popup_active = false;
                     self.status = AppStatus::RunningTask;
                 } else {

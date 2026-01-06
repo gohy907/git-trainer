@@ -215,7 +215,9 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         ])
         .split(frame.area());
 
-    let how_to_use_string = "← ↑ ↓ → для перемещения, q для выхода".to_string();
+    let how_to_use_string =
+        "← ↑ ↓ → — перемещение, q — выход, Enter — начать задание, r — перезагрузить задание"
+            .to_string();
     let how_to_use = Paragraph::new(how_to_use_string).centered();
 
     frame.render_widget(how_to_use, global_layout[2]);

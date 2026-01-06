@@ -55,7 +55,7 @@ pub fn format_image_name(task_name: &str) -> String {
 pub async fn create_task_container(task: &Task) -> Result<String, bollard::errors::Error> {
     let docker = docker_connect()?;
 
-    println!("{}", &task.work_name);
+    // eprintln!("{}", &task.work_name);
     match docker
         .inspect_container(&task.work_name, None::<InspectContainerOptions>)
         .await
@@ -70,7 +70,7 @@ pub async fn create_task_container(task: &Task) -> Result<String, bollard::error
         }
     }
 
-    println!("{}", &task.work_name);
+    // eprintln!("{}", &task.work_name);
     let create_opts = CreateContainerOptionsBuilder::new()
         .name(&task.work_name)
         .build();

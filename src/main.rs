@@ -9,17 +9,17 @@ use ratatui::{Frame, Terminal};
 use std::io;
 
 async fn run() -> bool {
-    let _ = color_eyre::install();
     let mut terminal = ratatui::init();
+    let _ = color_eyre::install();
 
     let mut app = App::new();
 
-    let _ = app.run_app(&mut terminal);
+    let _ = app.run_app(&mut terminal).await;
 
     ratatui::restore();
-
     match app.status {
         AppStatus::Exiting => false,
+
         AppStatus::RunningTask => {
             let task = &mut app.config.tasks[app.task_under_cursor];
 
@@ -38,15 +38,7 @@ async fn run() -> bool {
             };
             true
         }
-        AppStatus::RestartingTask => {
-            let task = &mut app.config.tasks[app.task_under_cursor];
-            match restart_task(task).await {
-                Err(err) => eprintln!("Error while restarting task: {}", err),
-                _ => {}
-            };
-            true
-        }
-        AppStatus::Idling => true,
+        _ => true,
     }
 }
 
