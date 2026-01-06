@@ -1,11 +1,13 @@
 use bollard::body_full;
 use bollard::{API_DEFAULT_VERSION, Docker};
+use std::process::Command;
 
 use crate::app::Task;
 use bollard::errors::Error;
 use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{
     BuildImageOptionsBuilder, CreateContainerOptionsBuilder, InspectContainerOptions,
+    RemoveContainerOptionsBuilder,
 };
 use futures_util::StreamExt;
 use nix::unistd::getuid;
@@ -124,7 +126,18 @@ pub async fn build_task_image(task: &Task) -> Result<(), BuildError> {
     Ok(())
 }
 
-use std::process::Command;
+pub async fn delete_task_container(task: &Task) -> Result<(), bollard::errors::Error> {
+    let uid = getuid().as_raw();
+    let socket = format!("/run/user/{uid}/docker.sock");
+
+    let docker = Docker::connect_with_unix(&socket, 120, API_DEFAULT_VERSION)?;
+
+    let options = RemoveContainerOptionsBuilder::new().build();
+    docker
+        .remove_container(&task.work_name, Some(options))
+        .await?;
+    Ok(())
+}
 
 pub fn run_interactive(task: &Task) -> io::Result<()> {
     let status = Command::new("docker")
