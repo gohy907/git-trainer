@@ -3,7 +3,6 @@ use bollard::{API_DEFAULT_VERSION, Docker};
 use std::process::Command;
 
 use crate::app::Task;
-use bollard::errors::Error;
 use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{
     BuildImageOptionsBuilder, CreateContainerOptionsBuilder, InspectContainerOptions,
@@ -17,6 +16,18 @@ use std::io::Read;
 use std::path::PathBuf;
 use thiserror::Error;
 use tokio::io;
+
+#[derive(Debug, Error)]
+pub enum BuildError {
+    #[error("Connection to Docker is not established: {0}")]
+    DockerConnection(#[from] bollard::errors::Error),
+
+    #[error("IO error: {0}")]
+    IOError(#[from] io::Error),
+
+    #[error("Env error: {0}")]
+    EnvError(#[from] env::VarError),
+}
 
 fn tasks_root() -> PathBuf {
     #[cfg(debug_assertions)]
@@ -41,7 +52,7 @@ pub fn format_image_name(task_name: &str) -> String {
     format!("git-trainer:{}", task_name)
 }
 
-pub async fn create_task_container(task: &Task) -> Result<String, Error> {
+pub async fn create_task_container(task: &Task) -> Result<String, bollard::errors::Error> {
     let docker = docker_connect()?;
 
     println!("{}", &task.work_name);
@@ -52,7 +63,8 @@ pub async fn create_task_container(task: &Task) -> Result<String, Error> {
         Ok(info) => {
             return Ok(info.id.unwrap());
         }
-        Err(Error::DockerResponseServerError { status_code, .. }) if status_code == 404 => {}
+        Err(bollard::errors::Error::DockerResponseServerError { status_code, .. })
+            if status_code == 404 => {}
         Err(e) => {
             return Err(e.into());
         }
@@ -77,18 +89,6 @@ pub async fn create_task_container(task: &Task) -> Result<String, Error> {
     let created = docker.create_container(Some(create_opts), config).await?;
 
     Ok(created.id)
-}
-
-#[derive(Debug, Error)]
-pub enum BuildError {
-    #[error("Connection to Docker is not established: {0}")]
-    DockerConnection(#[from] bollard::errors::Error),
-
-    #[error("IO error: {0}")]
-    IOError(#[from] io::Error),
-
-    #[error("Env error: {0}")]
-    EnvError(#[from] env::VarError),
 }
 
 pub async fn build_task_image(task: &Task) -> Result<(), BuildError> {
@@ -134,6 +134,12 @@ pub async fn delete_task_container(task: &Task) -> Result<(), bollard::errors::E
     docker
         .remove_container(&task.work_name, Some(options))
         .await?;
+    Ok(())
+}
+
+pub async fn restart_task(task: &Task) -> Result<(), bollard::errors::Error> {
+    delete_task_container(task).await?;
+    create_task_container(task).await?;
     Ok(())
 }
 
