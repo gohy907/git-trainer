@@ -30,15 +30,19 @@ fn tasks_root() -> PathBuf {
     }
 }
 
+fn docker_connect() -> Result<Docker, bollard::errors::Error> {
+    let uid = getuid().as_raw();
+    let socket = format!("/run/user/{uid}/docker.sock");
+
+    Docker::connect_with_unix(&socket, 120, API_DEFAULT_VERSION)
+}
+
 pub fn format_image_name(task_name: &str) -> String {
     format!("git-trainer:{}", task_name)
 }
 
 pub async fn create_task_container(task: &Task) -> Result<String, Error> {
-    let uid = getuid().as_raw();
-    let socket = format!("/run/user/{uid}/docker.sock");
-
-    let docker = Docker::connect_with_unix(&socket, 120, API_DEFAULT_VERSION)?;
+    let docker = docker_connect()?;
 
     println!("{}", &task.work_name);
     match docker
@@ -88,10 +92,7 @@ pub enum BuildError {
 }
 
 pub async fn build_task_image(task: &Task) -> Result<(), BuildError> {
-    let uid = getuid().as_raw();
-    let socket = format!("/run/user/{uid}/docker.sock");
-
-    let docker = Docker::connect_with_unix(&socket, 120, API_DEFAULT_VERSION)?;
+    let docker = docker_connect()?;
 
     let name_of_image = format_image_name(&task.work_name);
 
@@ -127,10 +128,7 @@ pub async fn build_task_image(task: &Task) -> Result<(), BuildError> {
 }
 
 pub async fn delete_task_container(task: &Task) -> Result<(), bollard::errors::Error> {
-    let uid = getuid().as_raw();
-    let socket = format!("/run/user/{uid}/docker.sock");
-
-    let docker = Docker::connect_with_unix(&socket, 120, API_DEFAULT_VERSION)?;
+    let docker = docker_connect()?;
 
     let options = RemoveContainerOptionsBuilder::new().build();
     docker
