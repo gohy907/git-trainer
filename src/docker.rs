@@ -2,7 +2,7 @@ use bollard::body_full;
 use bollard::{API_DEFAULT_VERSION, Docker};
 use std::process::Command;
 
-use crate::app::Task;
+use crate::app::{self, Task};
 use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{
     BuildImageOptionsBuilder, CreateContainerOptionsBuilder, InspectContainerOptions,
@@ -112,7 +112,6 @@ pub async fn build_task_image(task: &Task) -> Result<(), BuildError> {
 
     let mut build_stream =
         docker.build_image(build_options, None, Some(body_full(contents.into())));
-    println!("asdasdasd");
     while let Some(result) = build_stream.next().await {
         match result {
             Ok(output) => {
@@ -143,7 +142,22 @@ pub async fn restart_task(task: &Task) -> Result<(), bollard::errors::Error> {
     Ok(())
 }
 
-pub fn run_interactive(task: &Task) -> io::Result<()> {
+#[derive(Debug, Error)]
+#[error("Docker error: {message}")]
+pub struct DockerRunTaskError {
+    pub message: String,
+}
+
+#[derive(Debug, Error)]
+pub enum RunTaskError {
+    #[error("While running the command: {0}")]
+    IOError(#[from] io::Error),
+
+    #[error("Docker exited with code: {0}")]
+    DockerError(#[from] DockerRunTaskError),
+}
+
+pub fn run_interactive(task: &Task) -> Result<(), RunTaskError> {
     let status = Command::new("docker")
         .arg("start")
         .arg("-ai")
@@ -151,7 +165,10 @@ pub fn run_interactive(task: &Task) -> io::Result<()> {
         .status()?;
 
     if !status.success() {
-        eprintln!("docker run exited with status: {status}");
+        return Err(DockerRunTaskError {
+            message: status.to_string(),
+        }
+        .into());
     }
 
     Ok(())

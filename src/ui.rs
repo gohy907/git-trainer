@@ -1,5 +1,6 @@
 use crate::Frame;
 use crate::TaskStatus;
+use crate::app;
 use crate::app::App;
 use ratatui::layout::Constraint;
 use ratatui::layout::{Alignment, Flex};
@@ -203,10 +204,11 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
     frame.render_stateful_widget(t, rect, &mut app.table_state);
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum Popup {
     RunConifrmation,
     ResetConfirmation,
+    Error(String),
 }
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
@@ -231,12 +233,12 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 
     render_table(frame, global_layout[1], app);
     match app.active_popup {
-        Some(popup) => {
+        Some(ref popup) => {
             let (popup_block, popup_content, block_area, content_area) = match popup {
                 Popup::RunConifrmation => {
                     let lines_of_popup = vec![
-                        popup_line("Начать выполнение задания?"),
-                        popup_line("Enter — подтвердить, Esc — отменить"),
+                        popup_line("Начать выполнение задания?", Color::LightBlue),
+                        popup_line("Enter — подтвердить, Esc — отменить", Color::LightBlue),
                     ];
 
                     let popup_block = Block::bordered()
@@ -256,9 +258,9 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
                 }
                 Popup::ResetConfirmation => {
                     let lines_of_popup = vec![
-                        popup_line("Перезагрузить задание?"),
-                        popup_line("Вы потеряете все свои изменения."),
-                        popup_line("Enter — подтвердить, Esc — отменить"),
+                        popup_line("Перезагрузить задание?", Color::LightBlue),
+                        popup_line("Вы потеряете все свои изменения.", Color::LightBlue),
+                        popup_line("Enter — подтвердить, Esc — отменить", Color::LightBlue),
                     ];
 
                     let popup_block = Block::bordered()
@@ -274,6 +276,28 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
                     let area = popup_area(frame.area(), 40, 10);
 
                     let aboba = popup_area(area, 40, 3);
+                    (popup_block, popup_content, area, aboba)
+                }
+                Popup::Error(error) => {
+                    let lines_of_popup = vec![
+                        popup_line(&error, Color::Red),
+                        popup_line("Обратитесь к преподавателю.", Color::Red),
+                    ];
+
+                    let popup_block = Block::bordered()
+                        .fg(Color::Red)
+                        .title("Ошибка!")
+                        .title_alignment(Alignment::Center);
+
+                    let popup_content = Paragraph::new(lines_of_popup)
+                        .centered()
+                        .style(Style::default().fg(Color::Red))
+                        .wrap(Wrap { trim: true });
+
+                    let area = popup_area(frame.area(), 60, 20);
+
+                    let aboba = popup_area(area, 40, 3);
+
                     (popup_block, popup_content, area, aboba)
                 }
             };
@@ -294,6 +318,6 @@ fn popup_area(area: Rect, x: u16, y: u16) -> Rect {
     area
 }
 
-fn popup_line<'a>(s: &'a str) -> Line<'a> {
-    Line::from(s).style(Style::default().fg(Color::LightBlue))
+fn popup_line<'a>(s: &'a str, color: Color) -> Line<'a> {
+    Line::from(s).style(Style::default().fg(color))
 }

@@ -12,7 +12,43 @@ use crossterm::event::KeyEventKind;
 use ratatui::widgets::TableState;
 use std::fs;
 use thiserror::Error;
-use toml::de::Error;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("While working with config: {0}")]
+    ConfigError(#[from] ConfigIOError),
+
+    // TODO: Disambiguate
+    #[error("While working with Docker: {0}")]
+    DockerError(#[from] bollard::errors::Error),
+
+    #[error("While trying to run task: {0}")]
+    RunTaskError(#[from] docker::RunTaskError),
+}
+
+#[derive(Debug, Error)]
+pub enum ConfigIOError {
+    #[error("While saving config: {0}")]
+    Saving(#[from] SavingConfigError),
+
+    #[error("While  loading config : {0}")]
+    Loading(#[from] LoadingConfigError),
+}
+
+#[derive(Debug, Error)]
+pub enum SavingConfigError {
+    #[error("While serializing to TOML: {0}")]
+    SerializingError(#[from] toml::ser::Error),
+
+    #[error("IO error: {0}")]
+    IOError(#[from] io::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum LoadingConfigError {
+    #[error("While reading from TOML: {0}")]
+    TomlError(#[from] toml::de::Error),
+}
 
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
@@ -50,22 +86,13 @@ pub enum AppStatus {
     Exiting,
 }
 
-#[derive(Debug, Error)]
-pub enum SaveConfigError {
-    #[error("Serializing to TOML error: {0}")]
-    DockerConnection(#[from] toml::ser::Error),
-
-    #[error("IO error: {0}")]
-    IOError(#[from] io::Error),
-}
-
 impl Config {
-    pub fn load_config(path: &str) -> Result<Self, Error> {
+    pub fn load_config(path: &str) -> Result<Self, LoadingConfigError> {
         let text = fs::read_to_string(path).expect("failed to read config");
-        toml::from_str::<Config>(&text)
+        Ok(toml::from_str::<Config>(&text)?)
     }
 
-    pub fn save_config(&self) -> Result<(), SaveConfigError> {
+    pub fn save_config(&self) -> Result<(), SavingConfigError> {
         let toml_str = toml::to_string_pretty(&self)?;
         fs::write(INFO_PATH, toml_str)?;
         Ok(())
@@ -109,8 +136,7 @@ impl App {
                     let task = &mut self.config.tasks[self.task_under_cursor];
                     match docker::restart_task(task).await {
                         Err(err) => {
-                            // ratatui::restore();
-                            eprintln!("Error while restarting task: {}", err);
+                            self.active_popup = Some(Popup::Error(err.to_string()));
                         }
 
                         _ => {}
@@ -140,16 +166,17 @@ impl App {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Up => self.previous_row(),
             KeyCode::Down => self.next_row(),
-            KeyCode::Enter => match self.active_popup {
-                Some(popup) => {
-                    self.active_popup = None;
+            KeyCode::Enter => {
+                if let Some(popup) = self.active_popup.take() {
                     match popup {
                         Popup::RunConifrmation => self.status = AppStatus::RunningTask,
                         Popup::ResetConfirmation => self.status = AppStatus::RestartingTask,
+                        _ => {}
                     }
+                } else {
+                    self.active_popup = Some(Popup::RunConifrmation);
                 }
-                None => self.active_popup = Some(Popup::RunConifrmation),
-            },
+            }
             KeyCode::Char('r') => {
                 self.active_popup = Some(Popup::ResetConfirmation);
             }
