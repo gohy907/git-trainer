@@ -203,6 +203,12 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
     frame.render_stateful_widget(t, rect, &mut app.table_state);
 }
 
+#[derive(Clone, Copy)]
+pub enum Popup {
+    RunConifrmation,
+    ResetConfirmation,
+}
+
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let title = Line::from("git-trainer v0.0.2".bold()).centered();
 
@@ -224,29 +230,59 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     frame.render_widget(title, global_layout[0]);
 
     render_table(frame, global_layout[1], app);
-    if app.is_popup_active {
-        let lines_of_popup = vec![
-            popup_line("Начать выполнение задания?"),
-            popup_line("Enter — подтвердить, Esc — отменить"),
-        ];
+    match app.active_popup {
+        Some(popup) => {
+            let (popup_block, popup_content, block_area, content_area) = match popup {
+                Popup::RunConifrmation => {
+                    let lines_of_popup = vec![
+                        popup_line("Начать выполнение задания?"),
+                        popup_line("Enter — подтвердить, Esc — отменить"),
+                    ];
 
-        let popup_block = Block::bordered()
-            .fg(Color::LightBlue)
-            .title("Подтвердите выбор")
-            .title_alignment(Alignment::Center);
+                    let popup_block = Block::bordered()
+                        .fg(Color::LightBlue)
+                        .title("Подтвердите выбор")
+                        .title_alignment(Alignment::Center);
 
-        let popup_content = Paragraph::new(lines_of_popup)
-            .centered()
-            .style(Style::default().fg(Color::LightBlue))
-            .wrap(Wrap { trim: true });
+                    let popup_content = Paragraph::new(lines_of_popup)
+                        .centered()
+                        .style(Style::default().fg(Color::LightBlue))
+                        .wrap(Wrap { trim: true });
 
-        let area = popup_area(frame.area(), 40, 10);
+                    let area = popup_area(frame.area(), 40, 10);
 
-        let aboba = popup_area(area, 40, 2);
+                    let aboba = popup_area(area, 40, 2);
+                    (popup_block, popup_content, area, aboba)
+                }
+                Popup::ResetConfirmation => {
+                    let lines_of_popup = vec![
+                        popup_line("Перезагрузить задание?"),
+                        popup_line("Вы потеряете все свои изменения."),
+                        popup_line("Enter — подтвердить, Esc — отменить"),
+                    ];
 
-        frame.render_widget(Clear, area);
-        frame.render_widget(popup_block, area);
-        frame.render_widget(popup_content, aboba);
+                    let popup_block = Block::bordered()
+                        .fg(Color::LightBlue)
+                        .title("Подтвердите перезагрузку")
+                        .title_alignment(Alignment::Center);
+
+                    let popup_content = Paragraph::new(lines_of_popup)
+                        .centered()
+                        .style(Style::default().fg(Color::LightBlue))
+                        .wrap(Wrap { trim: true });
+
+                    let area = popup_area(frame.area(), 40, 10);
+
+                    let aboba = popup_area(area, 40, 3);
+                    (popup_block, popup_content, area, aboba)
+                }
+            };
+
+            frame.render_widget(Clear, block_area);
+            frame.render_widget(popup_block, block_area);
+            frame.render_widget(popup_content, content_area);
+        }
+        None => {}
     }
 }
 

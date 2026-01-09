@@ -4,6 +4,7 @@ use crate::app::event::Event;
 use crate::docker;
 use crate::io;
 use crate::ui;
+use crate::ui::Popup;
 use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
@@ -76,8 +77,8 @@ pub struct App {
     pub table_state: TableState,
     pub config: Config,
     pub task_under_cursor: usize,
-    pub is_popup_active: bool,
     pub status: AppStatus,
+    pub active_popup: Option<Popup>,
 }
 
 #[cfg(debug_assertions)]
@@ -93,9 +94,9 @@ impl App {
         App {
             table_state: table_state,
             config: { Config::load_config(INFO_PATH).expect("failed to load config") },
-            is_popup_active: false,
             task_under_cursor: 0,
             status: AppStatus::Idling,
+            active_popup: None,
         }
     }
 
@@ -139,20 +140,22 @@ impl App {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Up => self.previous_row(),
             KeyCode::Down => self.next_row(),
-            KeyCode::Enter => {
-                if self.is_popup_active {
-                    self.is_popup_active = false;
-                    self.status = AppStatus::RunningTask;
-                } else {
-                    self.is_popup_active = true;
+            KeyCode::Enter => match self.active_popup {
+                Some(popup) => {
+                    self.active_popup = None;
+                    match popup {
+                        Popup::RunConifrmation => self.status = AppStatus::RunningTask,
+                        Popup::ResetConfirmation => self.status = AppStatus::RestartingTask,
+                    }
                 }
-            }
+                None => self.active_popup = Some(Popup::RunConifrmation),
+            },
             KeyCode::Char('r') => {
-                self.status = AppStatus::RestartingTask;
+                self.active_popup = Some(Popup::ResetConfirmation);
             }
 
             KeyCode::Esc => {
-                self.is_popup_active = false;
+                self.active_popup = None;
             }
             _ => {}
         }
