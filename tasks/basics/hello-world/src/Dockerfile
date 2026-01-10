@@ -11,7 +11,7 @@ RUN useradd --create-home --shell /bin/bash "$USERNAME"
 
 WORKDIR /home/"$USERNAME"
 
-COPY src/repo hello-world
+COPY repo hello-world
 RUN git config --global user.name $GIT_USERNAME \
     && git config --global user.email $GIT_EMAIL \
     && git config --global --add safe.directory hello-world
