@@ -1,14 +1,15 @@
 use crate::Backend;
-use crate::Terminal;
 use crate::app::event::Event;
 use crate::docker;
 use crate::io;
+use crate::tty;
 use crate::ui;
 use crate::ui::Popup;
 use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
+use ratatui::DefaultTerminal;
 use ratatui::widgets::TableState;
 use std::fs;
 use thiserror::Error;
@@ -127,8 +128,8 @@ impl App {
         }
     }
 
-    pub async fn run_app<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
-        while self.status != AppStatus::Exiting && self.status != AppStatus::RunningTask {
+    pub async fn run_app(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+        while self.status != AppStatus::Exiting {
             terminal.draw(|f| ui(f, self))?;
             self.handle_events()?;
             match self.status {
@@ -141,6 +142,11 @@ impl App {
 
                         _ => {}
                     };
+                    self.status = AppStatus::Idling;
+                }
+                AppStatus::RunningTask => {
+                    let task = &mut self.config.tasks[self.task_under_cursor];
+                    self::App::prepare_pty(terminal, task);
                     self.status = AppStatus::Idling;
                 }
                 _ => {}

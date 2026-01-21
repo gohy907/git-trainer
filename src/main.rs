@@ -1,11 +1,12 @@
 mod app;
 mod docker;
+mod tty;
 mod ui;
 use crate::app::{App, AppStatus, TaskStatus};
 use crate::docker::{build_task_image, create_task_container, restart_task, run_interactive};
 use crate::ui::ui;
 use ratatui::prelude::Backend;
-use ratatui::{Frame, Terminal};
+use ratatui::{DefaultTerminal, Frame, Terminal};
 use std::io;
 
 async fn run() -> bool {
@@ -16,7 +17,6 @@ async fn run() -> bool {
 
     let _ = app.run_app(&mut terminal).await;
 
-    ratatui::restore();
     match app.status {
         AppStatus::Exiting => false,
 
@@ -24,10 +24,6 @@ async fn run() -> bool {
             let task = &mut app.config.tasks[app.task_under_cursor];
 
             match create_task_container(&task).await {
-                Err(err) => eprintln!("{err}"),
-                _ => {}
-            };
-            match run_interactive(task) {
                 Err(err) => eprintln!("{err}"),
                 _ => {}
             };
@@ -45,4 +41,5 @@ async fn run() -> bool {
 #[tokio::main]
 async fn main() {
     while run().await {}
+    ratatui::restore();
 }
