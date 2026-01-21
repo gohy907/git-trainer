@@ -1,6 +1,5 @@
 use crate::App;
-use crate::app::Task;
-use crate::docker::format_image_name;
+use crate::task::Task;
 use crate::ui;
 use bytes::Bytes;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
@@ -21,9 +20,6 @@ struct Size {
     rows: u16,
 }
 
-pub fn fmt(task_name: &str) -> String {
-    format!("git-trainer:{}", task_name)
-}
 impl App {
     pub fn prepare_pty(terminal: &mut DefaultTerminal, task: &Task) -> std::io::Result<()> {
         let size = Size {
@@ -37,7 +33,7 @@ impl App {
         cmd.arg("run");
         cmd.arg("-it"); // Interactive + TTY - КРИТИЧНО!
         // cmd.arg("--rm"); // Удалить контейнер после выхода
-        cmd.arg(fmt(&task.work_name)); // Образ (замените на свой)
+        cmd.arg(task.image_name()); // Образ (замените на свой)
         cmd.arg("/bin/bash");
         cmd.cwd(cwd);
 

@@ -1,12 +1,13 @@
 mod app;
 mod docker;
+mod task;
 mod tty;
 mod ui;
-use crate::app::{App, AppStatus, TaskStatus};
-use crate::docker::{build_task_image, create_task_container, restart_task, run_interactive};
+use crate::app::{App, AppStatus};
+use crate::docker::create_task_container;
+use crate::task::TaskStatus;
 use crate::ui::ui;
-use ratatui::prelude::Backend;
-use ratatui::{DefaultTerminal, Frame, Terminal};
+use ratatui::Frame;
 use std::io;
 
 async fn run() -> bool {

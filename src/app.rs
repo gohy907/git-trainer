@@ -1,8 +1,7 @@
-use crate::Backend;
 use crate::app::event::Event;
 use crate::docker;
 use crate::io;
-use crate::tty;
+use crate::task::Task;
 use crate::ui;
 use crate::ui::Popup;
 use crossterm::event;
@@ -57,26 +56,6 @@ pub struct Config {
     pub first_time: bool,
     pub first_time_desc: String,
     pub tasks: Vec<Task>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Task {
-    pub name: String,
-    pub desc: String,
-    pub work_name: String,
-    pub dir: String,
-    pub status: TaskStatus,
-    pub grade: Option<usize>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")] // "in_progress", "done", ...
-pub enum TaskStatus {
-    NotInProgress,
-    InProgress,
-    Done,
-    Pending,
-    Approved,
 }
 
 #[derive(PartialEq)]

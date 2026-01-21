@@ -1,10 +1,6 @@
 use crate::App;
 use crate::Frame;
 use crate::TaskStatus;
-use bytes::Bytes;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use nix::libc;
-use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
 use ratatui::layout::Constraint;
 use ratatui::layout::{Alignment, Flex};
 use ratatui::prelude::{Direction, Layout, Rect};
@@ -17,12 +13,6 @@ use ratatui::widgets::{Block, Cell, Row, Table};
 use ratatui::{
     text::{Line, Text},
     widgets::{Clear, Wrap},
-};
-use std::sync::Mutex;
-use std::{
-    io::{self, Read, Write},
-    sync::{Arc, RwLock, mpsc::Sender},
-    time::Duration,
 };
 use tui_term::vt100;
 use tui_term::widget::PseudoTerminal;

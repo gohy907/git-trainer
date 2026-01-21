@@ -1,19 +1,18 @@
+use crate::task::Task;
 use bollard::body_full;
-use bollard::{API_DEFAULT_VERSION, Docker};
-use std::process::Command;
-
-use crate::app::{self, Task};
 use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{
     BuildImageOptionsBuilder, CreateContainerOptionsBuilder, InspectContainerOptions,
     RemoveContainerOptionsBuilder,
 };
+use bollard::{API_DEFAULT_VERSION, Docker};
 use futures_util::StreamExt;
 use nix::unistd::getuid;
 use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+use std::process::Command;
 use thiserror::Error;
 use tokio::io;
 
@@ -48,10 +47,6 @@ fn docker_connect() -> Result<Docker, bollard::errors::Error> {
     Docker::connect_with_unix(&socket, 120, API_DEFAULT_VERSION)
 }
 
-pub fn format_image_name(task_name: &str) -> String {
-    format!("git-trainer:{}", task_name)
-}
-
 pub async fn create_task_container(task: &Task) -> Result<String, bollard::errors::Error> {
     let docker = docker_connect()?;
 
@@ -76,7 +71,7 @@ pub async fn create_task_container(task: &Task) -> Result<String, bollard::error
         .build();
 
     let config = ContainerCreateBody {
-        image: Some(format_image_name(&task.work_name)),
+        image: Some(task.image_name()),
         tty: Some(true),
         attach_stdin: Some(true),
         attach_stdout: Some(true),
@@ -94,7 +89,7 @@ pub async fn create_task_container(task: &Task) -> Result<String, bollard::error
 pub async fn build_task_image(task: &Task) -> Result<(), BuildError> {
     let docker = docker_connect()?;
 
-    let name_of_image = format_image_name(&task.work_name);
+    let name_of_image = task.image_name();
 
     let build_options = BuildImageOptionsBuilder::new()
         .dockerfile("src/Dockerfile")
