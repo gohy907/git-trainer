@@ -208,56 +208,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
     frame.render_stateful_widget(t, rect, &mut app.table_state);
 }
 
-#[derive(Clone)]
-pub enum Popup {
-    RunConifrmation,
-    ResetConfirmation,
-    Error(String),
-}
-
-pub fn ui(frame: &mut Frame, app: &mut App) {
-    let title = Line::from("git-trainer v0.0.2".bold()).centered();
-    // match app.status {
-    //     AppStatus::RunningTask => {
-    //         // let layout = Layout::default()
-    //         //     .direction(Direction::Vertical)
-    //         //     .constraints([
-    //         //         Constraint::Length(1),
-    //         //         Constraint::Min(1),
-    //         //         Constraint::Length(1),
-    //         //     ])
-    //         //     .split(frame.area());
-    //         //
-    //         // let block = Block::default()
-    //         //     .borders(Borders::ALL)
-    //         //     .style(Style::default().add_modifier(Modifier::BOLD));
-    //         // let pseudo_term = PseudoTerminal::new(frame).block(block);
-    //         // f.render_widget(pseudo_term, chunks[0]);
-    //         // let explanation = "Press q to exit".to_string();
-    //         // let explanation = Paragraph::new(explanation)
-    //         //     .style(Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED))
-    //         //     .alignment(Alignment::Center);
-    //     }
-    // }
-
-    let global_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Min(1),
-            Constraint::Length(1),
-        ])
-        .split(frame.area());
-
-    let how_to_use_string =
-        "← ↑ ↓ → — перемещение, q — выход, Enter — начать задание, r — перезагрузить задание"
-            .to_string();
-    let how_to_use = Paragraph::new(how_to_use_string).centered();
-
-    frame.render_widget(how_to_use, global_layout[2]);
-    frame.render_widget(title, global_layout[0]);
-
-    render_table(frame, global_layout[1], app);
+fn render_popup(frame: &mut Frame, app: &App) {
     match app.active_popup {
         Some(ref popup) => {
             let (popup_block, popup_content, block_area, content_area) = match popup {
@@ -334,6 +285,37 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         }
         None => {}
     }
+}
+
+#[derive(Clone)]
+pub enum Popup {
+    RunConifrmation,
+    ResetConfirmation,
+    Error(String),
+}
+
+pub fn ui(frame: &mut Frame, app: &mut App) {
+    let title = Line::from("git-trainer v0.0.2".bold()).centered();
+
+    let global_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(1),
+        ])
+        .split(frame.area());
+
+    let how_to_use_string =
+        "← ↑ ↓ → — перемещение, q — выход, Enter — начать задание, r — перезагрузить задание"
+            .to_string();
+    let how_to_use = Paragraph::new(how_to_use_string).centered();
+
+    frame.render_widget(how_to_use, global_layout[2]);
+    frame.render_widget(title, global_layout[0]);
+
+    render_table(frame, global_layout[1], app);
+    render_popup(frame, app);
 }
 
 fn popup_area(area: Rect, x: u16, y: u16) -> Rect {
