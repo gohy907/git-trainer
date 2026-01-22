@@ -59,9 +59,11 @@ impl App {
         let master_for_writer = master.clone();
         let master_for_run = master.clone();
 
+        let (exit_tx, exit_rx) = std::sync::mpsc::channel::<()>(); // Канал выхода
         // Reader поток
         {
             let parser = parser.clone();
+            let exit_tx = exit_tx.clone();
             std::thread::spawn(move || {
                 let mut reader = master_for_reader
                     .lock()
@@ -72,15 +74,22 @@ impl App {
                 let mut processed_buf = Vec::new();
 
                 loop {
-                    let sz = reader.read(&mut buf).unwrap();
-                    if sz == 0 {
-                        break;
-                    }
-                    if sz > 0 {
-                        processed_buf.extend_from_slice(&buf[..sz]);
-                        let mut parser = parser.write().unwrap();
-                        parser.process(&processed_buf);
-                        processed_buf.clear();
+                    match reader.read(&mut buf) {
+                        Ok(0) => {
+                            let _ = exit_tx.send(());
+                            break;
+                        }
+                        Ok(sz) => {
+                            processed_buf.extend_from_slice(&buf[..sz]);
+                            let mut parser = parser.write().unwrap();
+                            parser.process(&processed_buf);
+                            processed_buf.clear();
+                        }
+                        Err(e) => {
+                            eprintln!("Read error: {}", e);
+                            let _ = exit_tx.send(());
+                            break;
+                        }
                     }
                 }
             });
@@ -95,8 +104,7 @@ impl App {
             drop(writer);
         });
 
-        let result = Self::run_pty(terminal, parser, tx, master_for_run);
-        println!("{size:?}");
+        let result = Self::run_pty(terminal, parser, tx, master_for_run, exit_rx);
         result
     }
 
@@ -105,8 +113,12 @@ impl App {
         parser: Arc<RwLock<vt100::Parser>>,
         sender: Sender<Bytes>,
         master: Arc<Mutex<Box<dyn portable_pty::MasterPty + Send>>>,
+        exit_rx: std::sync::mpsc::Receiver<()>, // Добавляем receiver
     ) -> io::Result<()> {
         loop {
+            if exit_rx.try_recv().is_ok() {
+                return Ok(());
+            }
             terminal.draw(|f| ui::ui_pty(f, parser.read().unwrap().screen()))?;
 
             // Event read is blocking
@@ -137,7 +149,6 @@ impl App {
                                 }
                             } else {
                                 match key.code {
-                                    KeyCode::Char('q') => return Ok(()),
                                     KeyCode::Char(input) => sender
                                         .send(Bytes::from(input.to_string().into_bytes()))
                                         .unwrap(),
