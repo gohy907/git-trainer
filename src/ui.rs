@@ -19,6 +19,7 @@ use tui_term::widget::PseudoTerminal;
 use vt100::Screen;
 
 const LINE_WIDTH: u16 = 50;
+const VERSION: &str = "0.0.3";
 
 fn wrap(text: &str, width: usize, max_lines: usize) -> String {
     if width == 0 || max_lines == 0 {
@@ -295,7 +296,7 @@ pub enum Popup {
 }
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
-    let title = Line::from("git-trainer v0.0.2".bold()).centered();
+    let title = Line::from(format!("git-trainer v{}", VERSION).bold()).centered();
 
     let global_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -331,13 +332,14 @@ fn popup_line<'a>(s: &'a str, color: Color) -> Line<'a> {
 }
 
 pub fn ui_pty(f: &mut Frame, screen: &Screen) {
-    let chunks = ratatui::layout::Layout::default()
-        .direction(ratatui::layout::Direction::Vertical)
-        .margin(1)
+    let title = Line::from(format!("git-trainer v{}", VERSION).bold()).centered();
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
         .constraints(
             [
-                ratatui::layout::Constraint::Percentage(100),
-                ratatui::layout::Constraint::Min(1),
+                Constraint::Length(1),
+                Constraint::Min(1),
+                Constraint::Length(1),
             ]
             .as_ref(),
         )
@@ -346,10 +348,11 @@ pub fn ui_pty(f: &mut Frame, screen: &Screen) {
         .borders(Borders::ALL)
         .style(Style::default().add_modifier(Modifier::BOLD));
     let pseudo_term = PseudoTerminal::new(screen).block(block);
-    f.render_widget(pseudo_term, chunks[0]);
-    let explanation = "Press q to exit".to_string();
+    let explanation = "Напишите команду exit для выхода".to_string();
     let explanation = Paragraph::new(explanation)
-        .style(Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED))
+        .style(Style::default())
         .alignment(Alignment::Center);
-    // f.render_widget(explanation, chunks[1]);
+    f.render_widget(title, chunks[0]);
+    f.render_widget(pseudo_term, chunks[1]);
+    f.render_widget(explanation, chunks[2]);
 }
