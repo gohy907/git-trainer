@@ -1,13 +1,12 @@
 use crate::task::Task;
+use bollard::Docker;
 use bollard::body_full;
 use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{
     BuildImageOptionsBuilder, CreateContainerOptionsBuilder, InspectContainerOptions,
     RemoveContainerOptionsBuilder,
 };
-use bollard::{API_DEFAULT_VERSION, Docker};
 use futures_util::StreamExt;
-use nix::unistd::getuid;
 use std::env;
 use std::fs::File;
 use std::io::Read;
@@ -41,10 +40,7 @@ fn tasks_root() -> PathBuf {
 }
 
 fn docker_connect() -> Result<Docker, bollard::errors::Error> {
-    let uid = getuid().as_raw();
-    let socket = format!("/run/user/{uid}/docker.sock");
-
-    Docker::connect_with_unix(&socket, 120, API_DEFAULT_VERSION)
+    Docker::connect_with_socket_defaults()
 }
 
 pub async fn create_task_container(task: &Task) -> Result<String, bollard::errors::Error> {
