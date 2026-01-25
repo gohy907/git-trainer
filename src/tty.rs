@@ -23,18 +23,18 @@ struct Size {
 impl App {
     pub fn prepare_pty(terminal: &mut DefaultTerminal, task: &Task) -> std::io::Result<()> {
         let size = Size {
-            rows: terminal.size()?.height - 5,
-            cols: terminal.size()?.width,
+            rows: terminal.size()?.height - 4,
+            cols: terminal.size()?.width - 2,
         };
 
         let pty_system = NativePtySystem::default();
         let cwd = std::env::current_dir().unwrap();
         let mut cmd = CommandBuilder::new("docker");
-        cmd.arg("run");
-        cmd.arg("-it"); // Interactive + TTY - КРИТИЧНО!
+        cmd.arg("start");
+        cmd.arg("-ai"); // Interactive + TTY - КРИТИЧНО!
         // cmd.arg("--rm"); // Удалить контейнер после выхода
-        cmd.arg(task.image_name()); // Образ (замените на свой)
-        cmd.arg("/bin/bash");
+        cmd.arg(task.container_name()); // Образ (замените на свой)
+        // cmd.arg("/bin/bash");
         cmd.cwd(cwd);
 
         let pair = pty_system
@@ -218,15 +218,15 @@ impl App {
                     Event::Mouse(_) => {}
                     Event::Paste(_) => todo!(),
                     Event::Resize(cols, rows) => {
-                        parser.write().unwrap().set_size(rows - 5, cols);
+                        parser.write().unwrap().set_size(rows - 4, cols - 2);
                         #[cfg(unix)]
                         {
                             if let Ok(master_lock) = master.lock() {
                                 let raw_fd = master_lock.as_raw_fd();
                                 unsafe {
                                     let mut winsize: libc::winsize = std::mem::zeroed();
-                                    winsize.ws_row = rows - 5;
-                                    winsize.ws_col = cols;
+                                    winsize.ws_row = rows - 4;
+                                    winsize.ws_col = cols - 2;
                                     let _ =
                                         libc::ioctl(raw_fd.unwrap(), libc::TIOCSWINSZ, &winsize);
                                 }

@@ -24,4 +24,7 @@ impl Task {
     pub fn image_name(&self) -> String {
         format!("git-trainer:{}", self.work_name)
     }
+    pub fn container_name(&self) -> String {
+        format!("git-trainer_{}", self.work_name)
+    }
 }
