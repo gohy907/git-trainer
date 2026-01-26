@@ -52,9 +52,6 @@ pub enum RunPtyError {
 
     #[error("Task join error: {0}")]
     JoinError(#[from] tokio::task::JoinError),
-
-    #[error("Parser lock poisoned: {0}")]
-    ParserPoisoned(String),
 }
 
 impl App {
