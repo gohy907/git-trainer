@@ -3,16 +3,20 @@ use crate::task::Task;
 use crate::ui;
 use bytes::Bytes;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use nix::libc;
-use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
 use ratatui::DefaultTerminal;
-use std::sync::Mutex;
 use std::{
-    io::{self, Read, Write},
+    io::{self},
     sync::{Arc, RwLock, mpsc::Sender},
     time::Duration,
 };
+use thiserror::Error;
 use tui_term::vt100;
+
+use bollard::container::LogOutput;
+use futures::StreamExt;
+use tokio::io::AsyncWriteExt;
+
+use crate::docker::{self, resize_container};
 
 #[derive(Debug)]
 struct Size {
@@ -20,219 +24,220 @@ struct Size {
     rows: u16,
 }
 
+#[derive(Debug, Error)]
+pub enum PreparePtyError {
+    #[error("While working with Docker: {0}")]
+    DockerError(#[from] bollard::errors::Error),
+
+    #[error("IO error: {0}")]
+    DrawTerminalError(#[from] io::Error),
+
+    #[error("While running PTY: {0}")]
+    RunPtyError(#[from] RunPtyError),
+
+    #[error("Task join error: {0}")]
+    JoinError(#[from] tokio::task::JoinError),
+}
+
+#[derive(Debug, Error)]
+pub enum RunPtyError {
+    #[error("While working with Docker: {0}")]
+    DockerError(#[from] bollard::errors::Error),
+
+    #[error("IO error: {0}")]
+    DrawTerminalError(#[from] io::Error),
+
+    #[error("While sending to PTY: {0}")]
+    MPSCError(#[from] std::sync::mpsc::SendError<bytes::Bytes>),
+
+    #[error("Task join error: {0}")]
+    JoinError(#[from] tokio::task::JoinError),
+
+    #[error("Parser lock poisoned: {0}")]
+    ParserPoisoned(String),
+}
+
 impl App {
-    pub fn prepare_pty(terminal: &mut DefaultTerminal, task: &Task) -> std::io::Result<()> {
+    pub async fn prepare_pty_bollard(
+        terminal: &mut DefaultTerminal,
+        task: &Task,
+    ) -> Result<(), PreparePtyError> {
+        let mut handles = Vec::new();
         let size = Size {
             rows: terminal.size()?.height - 4,
             cols: terminal.size()?.width - 2,
         };
 
-        let pty_system = NativePtySystem::default();
-        let cwd = std::env::current_dir().unwrap();
-        let mut cmd = CommandBuilder::new("docker");
-        cmd.arg("start");
-        cmd.arg("-ai"); // Interactive + TTY - КРИТИЧНО!
-        // cmd.arg("--rm"); // Удалить контейнер после выхода
-        cmd.arg(task.container_name()); // Образ (замените на свой)
-        // cmd.arg("/bin/bash");
-        cmd.cwd(cwd);
+        docker::start_container(task).await?;
 
-        let pair = pty_system
-            .openpty(PtySize {
-                rows: size.rows,
-                cols: size.cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .unwrap();
-        // Wait for the child to complete
-        std::thread::spawn(move || {
-            let mut child = pair.slave.spawn_command(cmd).unwrap();
-            let _child_exit_status = child.wait().unwrap();
-            drop(pair.slave);
-        });
+        let container_name = task.container_name();
+        docker::resize_container(container_name.clone(), size.rows as i32, size.cols as i32)
+            .await?;
+        let res = docker::attach_container(task).await?;
 
-        pair.master.try_clone_reader().unwrap();
+        let mut output_stream = res.output;
+        let mut input = res.input;
+
+        {
+            let rows = size.rows as i32;
+            let cols = size.cols as i32;
+            let container_name = task.container_name();
+            let handle = tokio::spawn(async move {
+                let _ = resize_container(container_name, rows, cols).await;
+            });
+            handles.push(handle);
+        }
+
         let parser = Arc::new(RwLock::new(vt100::Parser::new(size.rows, size.cols, 0)));
-        let master = Arc::new(Mutex::new(pair.master));
-        let master_for_reader = master.clone();
-        let master_for_writer = master.clone();
-        let master_for_run = master.clone();
 
-        let (exit_tx, exit_rx) = std::sync::mpsc::channel::<()>(); // Канал выхода
-        // Reader поток
+        let (tx, rx) = std::sync::mpsc::channel::<Bytes>();
+        let (exit_tx, exit_rx) = std::sync::mpsc::channel::<()>();
+
         {
             let parser = parser.clone();
             let exit_tx = exit_tx.clone();
-            std::thread::spawn(move || {
-                let mut reader = master_for_reader
-                    .lock()
-                    .unwrap()
-                    .try_clone_reader()
-                    .unwrap();
-                let mut buf = [0u8; 8192];
-                let mut processed_buf = Vec::new();
+            let handle = tokio::spawn(async move {
+                let mut buf = Vec::new();
+                while let Some(item) = output_stream.next().await {
+                    match item {
+                        Ok(log) => {
+                            let bytes: &[u8] = match log {
+                                LogOutput::StdOut { ref message } => message.as_ref(),
+                                LogOutput::StdErr { ref message } => message.as_ref(),
+                                LogOutput::StdIn { ref message } => message.as_ref(),
+                                LogOutput::Console { ref message } => message.as_ref(),
+                            };
 
-                loop {
-                    match reader.read(&mut buf) {
-                        Ok(0) => {
-                            let _ = exit_tx.send(());
-                            break;
-                        }
-                        Ok(sz) => {
-                            processed_buf.extend_from_slice(&buf[..sz]);
-                            let mut parser = parser.write().unwrap();
-                            parser.process(&processed_buf);
-                            processed_buf.clear();
+                            if !bytes.is_empty() {
+                                buf.extend_from_slice(bytes);
+                                if let Ok(mut p) = parser.write() {
+                                    p.process(&buf);
+                                }
+                                buf.clear();
+                            }
                         }
                         Err(e) => {
-                            eprintln!("Read error: {}", e);
+                            eprintln!("docker output error: {e}");
                             let _ = exit_tx.send(());
                             break;
                         }
                     }
                 }
+                let _ = exit_tx.send(());
             });
+            handles.push(handle);
         }
-        let (tx, rx) = std::sync::mpsc::channel::<Bytes>();
-        // Writer поток
-        std::thread::spawn(move || {
-            let mut writer = master_for_writer.lock().unwrap().take_writer().unwrap();
-            while let Ok(bytes) = rx.recv() {
-                writer.write_all(&bytes).unwrap();
-            }
-            drop(writer);
-        });
 
-        let result = Self::run_pty(terminal, parser, tx, master_for_run, exit_rx);
-        result
+        // Writer таск
+        let handle = tokio::spawn(async move {
+            while let Ok(bytes) = rx.recv() {
+                if input.write_all(&bytes).await.is_err() {
+                    break;
+                }
+                if input.flush().await.is_err() {
+                    break;
+                }
+            }
+        });
+        handles.push(handle);
+
+        Self::run_pty_bollard(terminal, parser, tx, exit_rx, container_name).await?;
+
+        for handle in handles {
+            handle.await.map_err(PreparePtyError::JoinError)?;
+        }
+        Ok(())
     }
 
-    pub fn run_pty(
+    pub async fn run_pty_bollard(
         terminal: &mut DefaultTerminal,
         parser: Arc<RwLock<vt100::Parser>>,
         sender: Sender<Bytes>,
-        master: Arc<Mutex<Box<dyn portable_pty::MasterPty + Send>>>,
-        exit_rx: std::sync::mpsc::Receiver<()>, // Добавляем receiver
-    ) -> io::Result<()> {
+        exit_rx: std::sync::mpsc::Receiver<()>,
+        container_name: String,
+    ) -> Result<(), RunPtyError> {
+        let mut handles = Vec::new();
         loop {
             if exit_rx.try_recv().is_ok() {
+                for handle in handles {
+                    if let Err(e) = handle.await {
+                        return Err(RunPtyError::JoinError(e));
+                    }
+                }
                 return Ok(());
             }
+
             terminal.draw(|f| ui::ui_pty(f, parser.read().unwrap().screen()))?;
 
-            // Event read is blocking
             if event::poll(Duration::from_millis(10))? {
-                // It's guaranteed that the `read()` won't block when the `poll()`
-                // function returns `true`
                 match event::read()? {
                     Event::Key(key) => {
                         if key.kind == KeyEventKind::Press {
                             if key.modifiers == KeyModifiers::CONTROL {
                                 match key.code {
-                                    KeyCode::Char('c') => {
-                                        sender.send(Bytes::from(vec![3])).unwrap()
-                                    }
-                                    KeyCode::Char('v') => {
-                                        sender.send(Bytes::from(vec![22])).unwrap()
-                                    }
-                                    KeyCode::Char('d') => {
-                                        sender.send(Bytes::from(vec![4])).unwrap()
-                                    }
-                                    KeyCode::Char('z') => {
-                                        sender.send(Bytes::from(vec![26])).unwrap()
-                                    }
-                                    KeyCode::Char('l') => {
-                                        sender.send(Bytes::from(vec![12])).unwrap()
-                                    }
+                                    KeyCode::Char('c') => sender.send(Bytes::from(vec![3]))?,
+                                    KeyCode::Char('v') => sender.send(Bytes::from(vec![22]))?,
+                                    KeyCode::Char('d') => sender.send(Bytes::from(vec![4]))?,
+                                    KeyCode::Char('z') => sender.send(Bytes::from(vec![26]))?,
+                                    KeyCode::Char('l') => sender.send(Bytes::from(vec![12]))?,
                                     _ => {}
                                 }
                             } else {
                                 match key.code {
-                                    KeyCode::Char(input) => sender
-                                        .send(Bytes::from(input.to_string().into_bytes()))
-                                        .unwrap(),
+                                    KeyCode::Char(input) => {
+                                        sender.send(Bytes::from(input.to_string().into_bytes()))?
+                                    }
                                     KeyCode::Backspace => {
-                                        sender.send(Bytes::from(vec![8])).unwrap();
+                                        sender.send(Bytes::from(vec![8]))?;
                                     }
                                     KeyCode::Enter => {
                                         #[cfg(unix)]
-                                        sender.send(Bytes::from(vec![b'\n'])).unwrap();
+                                        sender.send(Bytes::from(vec![b'\n']))?;
                                         #[cfg(windows)]
-                                        sender.send(Bytes::from(vec![b'\r', b'\n'])).unwrap();
+                                        sender.send(Bytes::from(vec![b'\r', b'\n']))?;
                                     }
-                                    KeyCode::Left => {
-                                        sender.send(Bytes::from(vec![27, 91, 68])).unwrap()
-                                    }
-                                    KeyCode::Right => {
-                                        sender.send(Bytes::from(vec![27, 91, 67])).unwrap()
-                                    }
-                                    KeyCode::Up => {
-                                        sender.send(Bytes::from(vec![27, 91, 65])).unwrap()
-                                    }
-                                    KeyCode::Down => {
-                                        sender.send(Bytes::from(vec![27, 91, 66])).unwrap()
-                                    }
-                                    KeyCode::Home => {
-                                        sender.send(Bytes::from(vec![27, 91, 72])).unwrap()
-                                    }
-                                    KeyCode::End => {
-                                        sender.send(Bytes::from(vec![27, 91, 70])).unwrap()
-                                    }
+                                    KeyCode::Left => sender.send(Bytes::from(vec![27, 91, 68]))?,
+                                    KeyCode::Right => sender.send(Bytes::from(vec![27, 91, 67]))?,
+                                    KeyCode::Up => sender.send(Bytes::from(vec![27, 91, 65]))?,
+                                    KeyCode::Down => sender.send(Bytes::from(vec![27, 91, 66]))?,
+                                    KeyCode::Home => sender.send(Bytes::from(vec![27, 91, 72]))?,
+                                    KeyCode::End => sender.send(Bytes::from(vec![27, 91, 70]))?,
                                     KeyCode::PageUp => {
-                                        sender.send(Bytes::from(vec![27, 91, 53, 126])).unwrap()
+                                        sender.send(Bytes::from(vec![27, 91, 53, 126]))?
                                     }
                                     KeyCode::PageDown => {
-                                        sender.send(Bytes::from(vec![27, 91, 54, 126])).unwrap()
+                                        sender.send(Bytes::from(vec![27, 91, 54, 126]))?
                                     }
-                                    KeyCode::Tab => sender.send(Bytes::from(vec![9])).unwrap(),
+                                    KeyCode::Tab => sender.send(Bytes::from(vec![9]))?,
                                     KeyCode::BackTab => {
-                                        sender.send(Bytes::from(vec![27, 91, 90])).unwrap()
+                                        sender.send(Bytes::from(vec![27, 91, 90]))?
                                     }
                                     KeyCode::Delete => {
-                                        sender.send(Bytes::from(vec![27, 91, 51, 126])).unwrap()
+                                        sender.send(Bytes::from(vec![27, 91, 51, 126]))?
                                     }
                                     KeyCode::Insert => {
-                                        sender.send(Bytes::from(vec![27, 91, 50, 126])).unwrap()
+                                        sender.send(Bytes::from(vec![27, 91, 50, 126]))?
                                     }
-                                    KeyCode::F(_) => todo!(),
-                                    KeyCode::Null => todo!(),
                                     KeyCode::Esc => {
-                                        sender.send(Bytes::from(vec![27])).unwrap();
+                                        sender.send(Bytes::from(vec![27]))?;
                                     }
-                                    KeyCode::CapsLock => todo!(),
-                                    KeyCode::ScrollLock => todo!(),
-                                    KeyCode::NumLock => todo!(),
-                                    KeyCode::PrintScreen => todo!(),
-                                    KeyCode::Pause => todo!(),
-                                    KeyCode::Menu => todo!(),
-                                    KeyCode::KeypadBegin => todo!(),
-                                    KeyCode::Media(_) => todo!(),
                                     _ => {}
                                 }
                             }
                         }
                     }
-                    Event::FocusGained => {}
-                    Event::FocusLost => {}
-                    Event::Mouse(_) => {}
-                    Event::Paste(_) => todo!(),
                     Event::Resize(cols, rows) => {
-                        parser.write().unwrap().set_size(rows - 4, cols - 2);
-                        #[cfg(unix)]
-                        {
-                            if let Ok(master_lock) = master.lock() {
-                                let raw_fd = master_lock.as_raw_fd();
-                                unsafe {
-                                    let mut winsize: libc::winsize = std::mem::zeroed();
-                                    winsize.ws_row = rows - 4;
-                                    winsize.ws_col = cols - 2;
-                                    let _ =
-                                        libc::ioctl(raw_fd.unwrap(), libc::TIOCSWINSZ, &winsize);
-                                }
-                            }
-                        }
+                        let rows = rows - 4;
+                        let cols = cols - 2;
+                        parser.write().unwrap().set_size(rows, cols);
+                        let name = container_name.clone();
+
+                        let handle = tokio::spawn(async move {
+                            let _ = resize_container(name, rows as i32, cols as i32).await;
+                        });
+                        handles.push(handle);
                     }
+                    _ => {}
                 }
             }
         }

@@ -1,17 +1,19 @@
 use crate::task::Task;
 use bollard::Docker;
 use bollard::body_full;
+use bollard::container::AttachContainerResults;
 use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{
-    BuildImageOptionsBuilder, CreateContainerOptionsBuilder, InspectContainerOptions,
-    RemoveContainerOptionsBuilder,
+    AttachContainerOptionsBuilder, BuildImageOptionsBuilder, CreateContainerOptionsBuilder,
+    InspectContainerOptions, RemoveContainerOptionsBuilder, ResizeContainerTTYOptionsBuilder,
+    StartContainerOptionsBuilder,
 };
+
 use futures_util::StreamExt;
 use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
-use std::process::Command;
 use thiserror::Error;
 use tokio::io;
 
@@ -148,19 +150,42 @@ pub enum RunTaskError {
     DockerError(#[from] DockerRunTaskError),
 }
 
-pub fn run_interactive(task: &Task) -> Result<(), RunTaskError> {
-    let status = Command::new("docker")
-        .arg("start")
-        .arg("-ai")
-        .arg(&task.work_name)
-        .status()?;
+pub async fn start_container(task: &Task) -> Result<(), bollard::errors::Error> {
+    let docker = docker_connect()?;
+    let start_opts = StartContainerOptionsBuilder::new().build();
+    docker
+        .start_container(&task.container_name(), Some(start_opts))
+        .await
+}
 
-    if !status.success() {
-        return Err(DockerRunTaskError {
-            message: status.to_string(),
-        }
-        .into());
-    }
+pub async fn resize_container(
+    container_name: String,
+    rows: i32,
+    cols: i32,
+) -> Result<(), bollard::errors::Error> {
+    let docker = docker_connect()?;
+    let resize_opts = ResizeContainerTTYOptionsBuilder::new()
+        .h(rows)
+        .w(cols)
+        .build();
+    docker
+        .resize_container_tty(&container_name, resize_opts)
+        .await
+}
 
-    Ok(())
+pub async fn attach_container(
+    task: &Task,
+) -> Result<AttachContainerResults, bollard::errors::Error> {
+    let docker = docker_connect()?;
+    let attach_opts = AttachContainerOptionsBuilder::new()
+        .stdin(true)
+        .stdout(true)
+        .stderr(true)
+        .stream(true)
+        .logs(false)
+        .build();
+
+    docker
+        .attach_container(&task.container_name(), Some(attach_opts))
+        .await
 }

@@ -125,7 +125,7 @@ impl App {
                 }
                 AppStatus::RunningTask => {
                     let task = &mut self.config.tasks[self.task_under_cursor];
-                    self::App::prepare_pty(terminal, task);
+                    self::App::prepare_pty_bollard(terminal, task).await;
                     self.status = AppStatus::Idling;
                 }
                 _ => {}
