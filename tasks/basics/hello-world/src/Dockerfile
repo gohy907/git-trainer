@@ -5,7 +5,10 @@ ARG GIT_USERNAME=aboba
 ARG GIT_EMAIL=aboba@aboba.com
 
 RUN apt-get update
-RUN apt-get install -y git neovim nano 
+RUN apt-get install -y git neovim nano locales
+echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+locale-gen
+export LANG=en_US.UTF-8
 
 RUN useradd --create-home --shell /bin/bash "$USERNAME"
 
