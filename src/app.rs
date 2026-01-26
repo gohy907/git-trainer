@@ -115,9 +115,7 @@ impl App {
                 AppStatus::RestartingTask => {
                     let task = &mut self.config.tasks[self.task_under_cursor];
                     match docker::restart_task(task).await {
-                        Err(err) => {
-                            self.active_popup = Some(Popup::Error(err.to_string()));
-                        }
+                        Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
 
                         _ => {}
                     };
@@ -125,7 +123,11 @@ impl App {
                 }
                 AppStatus::RunningTask => {
                     let task = &mut self.config.tasks[self.task_under_cursor];
-                    self::App::prepare_pty_bollard(terminal, task).await;
+                    match self::App::prepare_pty_bollard(terminal, task).await {
+                        Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
+
+                        _ => {}
+                    }
                     self.status = AppStatus::Idling;
                 }
                 _ => {}

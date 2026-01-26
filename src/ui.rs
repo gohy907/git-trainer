@@ -259,6 +259,7 @@ fn render_popup(frame: &mut Frame, app: &App) {
                 Popup::Error(error) => {
                     let lines_of_popup = vec![
                         popup_line(&error, Color::Red),
+                        popup_line("", Color::Red),
                         popup_line("Обратитесь к преподавателю.", Color::Red),
                     ];
 
@@ -274,7 +275,7 @@ fn render_popup(frame: &mut Frame, app: &App) {
 
                     let area = popup_area(frame.area(), 60, 20);
 
-                    let aboba = popup_area(area, 40, 3);
+                    let aboba = popup_area(area, 40, 10);
 
                     (popup_block, popup_content, area, aboba)
                 }
