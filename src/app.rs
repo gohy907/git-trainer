@@ -8,6 +8,7 @@ use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
+use futures::stream::ReuniteError;
 use ratatui::DefaultTerminal;
 use ratatui::widgets::TableState;
 use std::fs;
@@ -176,6 +177,9 @@ impl App {
     }
 
     pub fn next_row(&mut self) {
+        if self.is_popup_active() {
+            return;
+        }
         let i = match self.table_state.selected() {
             Some(i) if i + 1 < self.config.tasks.len() => i + 1,
             _ => 0,
@@ -185,6 +189,16 @@ impl App {
     }
 
     pub fn previous_row(&mut self) {
+        if self.is_popup_active() {
+            return;
+        }
+        match &self.active_popup {
+            Some(popup) => match popup {
+                Popup::Error(_) => return,
+                _ => {}
+            },
+            _ => {}
+        }
         let len = self.config.tasks.len();
         let i = match self.table_state.selected() {
             Some(0) | None => len - 1,
@@ -196,5 +210,12 @@ impl App {
 
     fn exit(&mut self) {
         self.status = AppStatus::Exiting;
+    }
+
+    fn is_popup_active(&self) -> bool {
+        match self.active_popup {
+            Some(_) => true,
+            _ => false,
+        }
     }
 }
