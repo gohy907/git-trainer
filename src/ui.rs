@@ -298,6 +298,27 @@ fn render_popup(frame: &mut Frame, app: &App) {
                     let aboba = popup_area(area, 40, 3);
                     (popup_block, popup_content, area, aboba)
                 }
+                _ => {
+                    let lines_of_popup = vec![popup_line(
+                        &app.config.tasks[app.task_under_cursor].desc,
+                        Color::LightBlue,
+                    )];
+
+                    let popup_block = Block::bordered()
+                        .fg(Color::LightBlue)
+                        .title_alignment(Alignment::Center);
+
+                    let popup_content = Paragraph::new(lines_of_popup)
+                        .centered()
+                        .style(Style::default().fg(Color::LightBlue))
+                        .wrap(Wrap { trim: true });
+
+                    let area = popup_area(frame.area(), 60, 20);
+
+                    let aboba = popup_area(area, 58, 10);
+
+                    (popup_block, popup_content, area, aboba)
+                }
             };
 
             frame.render_widget(Clear, block_area);
@@ -314,6 +335,7 @@ pub enum Popup {
     ResetConfirmation,
     ResetDone,
     Error(String),
+    Help,
 }
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
@@ -352,7 +374,7 @@ fn popup_line<'a>(s: &'a str, color: Color) -> Line<'a> {
     Line::from(s).style(Style::default().fg(color))
 }
 
-pub fn ui_pty(f: &mut Frame, screen: &Screen) {
+pub fn ui_pty(f: &mut Frame, screen: &Screen, app: &mut App) {
     let title = Line::from(format!("git-trainer v{}", VERSION).bold()).centered();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -376,4 +398,6 @@ pub fn ui_pty(f: &mut Frame, screen: &Screen) {
     f.render_widget(title, chunks[0]);
     f.render_widget(pseudo_term, chunks[1]);
     f.render_widget(explanation, chunks[2]);
+
+    render_popup(f, app);
 }
