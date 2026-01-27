@@ -14,6 +14,7 @@ use ratatui::{
     text::{Line, Text},
     widgets::{Clear, Wrap},
 };
+use std::rc::Rc;
 use tui_term::vt100;
 use tui_term::widget::PseudoTerminal;
 use vt100::Screen;
@@ -298,11 +299,16 @@ fn render_popup(frame: &mut Frame, app: &App) {
                     let aboba = popup_area(area, 40, 3);
                     (popup_block, popup_content, area, aboba)
                 }
-                _ => {
-                    let lines_of_popup = vec![popup_line(
-                        &app.config.tasks[app.task_under_cursor].desc,
-                        Color::LightBlue,
-                    )];
+                Popup::Help => {
+                    let wrapped_desc = wrap(
+                        &app.config.tasks[app.task_under_cursor].extended_desc,
+                        LINE_WIDTH as usize,
+                        1,
+                    );
+                    let lines_of_popup = vec![
+                        popup_line(wrapped_desc, Color::LightBlue),
+                        popup_line("Нажмите Enter, чтобы продолжить", Color::LightBlue),
+                    ];
 
                     let popup_block = Block::bordered()
                         .fg(Color::LightBlue)
@@ -391,7 +397,8 @@ pub fn ui_pty(f: &mut Frame, screen: &Screen, app: &mut App) {
         .borders(Borders::ALL)
         .style(Style::default().add_modifier(Modifier::BOLD));
     let pseudo_term = PseudoTerminal::new(screen).block(block);
-    let explanation = "Напишите команду exit для выхода".to_string();
+    let explanation =
+        "Напишите команду exit для выхода, Ctrl+h для формулировки задания".to_string();
     let explanation = Paragraph::new(explanation)
         .style(Style::default())
         .alignment(Alignment::Center);

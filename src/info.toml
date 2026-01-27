@@ -9,43 +9,47 @@ desc = """
 В этой задаче Вам предстоит создать новый 
 Git репозиторий и сделать в нём первый коммит.
 """
+extended_desc = """
+Давайте начнём с чего-нибудь лёгкого. \n
+Создайте в папке новый Git репозиторий и сделайте в нём какой-либо начальный коммит. 
+"""
 work_name = "hello-world"
 dir = "basics"
 status = "in_progress"
 
-[[tasks]]
-name = "Абоба"
-desc = """
-a
-"""
-work_name = "ab"
-dir = "a"
-status = "approved"
-grade = 5
-
-[[tasks]]
-name = "Абоба"
-desc = """
-a
-"""
-work_name = "ab"
-dir = "a"
-status = "pending"
-
-[[tasks]]
-name = "Абоба"
-desc = """
-a
-"""
-work_name = "ab"
-dir = "a"
-status = "done"
-
-[[tasks]]
-name = "Абоба"
-desc = """
-a
-"""
-work_name = "ab"
-dir = "a"
-status = "not_in_progress"
+# [[tasks]]
+# name = "Абоба"
+# desc = """
+# a
+# """
+# work_name = "ab"
+# dir = "a"
+# status = "approved"
+# grade = 5
+#
+# [[tasks]]
+# name = "Абоба"
+# desc = """
+# a
+# """
+# work_name = "ab"
+# dir = "a"
+# status = "pending"
+#
+# [[tasks]]
+# name = "Абоба"
+# desc = """
+# a
+# """
+# work_name = "ab"
+# dir = "a"
+# status = "done"
+#
+# [[tasks]]
+# name = "Абоба"
+# desc = """
+# a
+# """
+# work_name = "ab"
+# dir = "a"
+# status = "not_in_progress"
