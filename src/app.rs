@@ -8,7 +8,6 @@ use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
-use futures::stream::ReuniteError;
 use ratatui::DefaultTerminal;
 use ratatui::widgets::TableState;
 use std::fs;
@@ -123,10 +122,10 @@ impl App {
                     self.status = AppStatus::Idling;
                 }
                 AppStatus::RunningTask => {
-                    let task = &mut self.config.tasks[self.task_under_cursor];
-                    match self::App::prepare_pty_bollard(terminal, task).await {
-                        Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
+                    let task = self.config.tasks[self.task_under_cursor].clone();
 
+                    match self.prepare_pty_bollard(terminal, &task).await {
+                        Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
                         _ => {}
                     }
                     self.status = AppStatus::Idling;
