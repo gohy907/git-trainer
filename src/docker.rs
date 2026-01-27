@@ -50,7 +50,7 @@ pub async fn create_task_container(task: &Task) -> Result<String, bollard::error
 
     // eprintln!("{}", &task.work_name);
     match docker
-        .inspect_container(&task.work_name, None::<InspectContainerOptions>)
+        .inspect_container(&task.container_name(), None::<InspectContainerOptions>)
         .await
     {
         Ok(info) => {
@@ -65,7 +65,7 @@ pub async fn create_task_container(task: &Task) -> Result<String, bollard::error
 
     // eprintln!("{}", &task.work_name);
     let create_opts = CreateContainerOptionsBuilder::new()
-        .name(&task.work_name)
+        .name(&task.container_name())
         .build();
 
     let config = ContainerCreateBody {
@@ -124,13 +124,18 @@ pub async fn delete_task_container(task: &Task) -> Result<(), bollard::errors::E
 
     let options = RemoveContainerOptionsBuilder::new().build();
     docker
-        .remove_container(&task.work_name, Some(options))
-        .await?;
-    Ok(())
+        .remove_container(&task.container_name(), Some(options))
+        .await
 }
 
 pub async fn restart_task(task: &Task) -> Result<(), bollard::errors::Error> {
-    delete_task_container(task).await?;
+    match delete_task_container(task).await {
+        Ok(_) => {}
+        Err(bollard::errors::Error::DockerResponseServerError { status_code, .. })
+            if status_code == 404 => {}
+        Err(e) => return Err(e),
+    }
+
     create_task_container(task).await?;
     Ok(())
 }
