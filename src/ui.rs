@@ -275,8 +275,27 @@ fn render_popup(frame: &mut Frame, app: &App) {
 
                     let area = popup_area(frame.area(), 60, 20);
 
-                    let aboba = popup_area(area, 40, 10);
+                    let aboba = popup_area(area, 58, 10);
 
+                    (popup_block, popup_content, area, aboba)
+                }
+                Popup::ResetDone => {
+                    let lines_of_popup = vec![
+                        popup_line("Задание перезагружено.", Color::LightGreen),
+                        popup_line("Нажмите Enter, чтобы продолжить", Color::LightGreen),
+                    ];
+
+                    let popup_block = Block::bordered()
+                        .fg(Color::LightGreen)
+                        .title_alignment(Alignment::Center);
+
+                    let popup_content = Paragraph::new(lines_of_popup)
+                        .centered()
+                        .style(Style::default().fg(Color::LightGreen))
+                        .wrap(Wrap { trim: true });
+
+                    let area = popup_area(frame.area(), 40, 10);
+                    let aboba = popup_area(area, 40, 3);
                     (popup_block, popup_content, area, aboba)
                 }
             };
@@ -293,6 +312,7 @@ fn render_popup(frame: &mut Frame, app: &App) {
 pub enum Popup {
     RunConifrmation,
     ResetConfirmation,
+    ResetDone,
     Error(String),
 }
 

@@ -158,8 +158,11 @@ impl App {
                 if let Some(popup) = self.active_popup.take() {
                     match popup {
                         Popup::RunConifrmation => self.status = AppStatus::RunningTask,
-                        Popup::ResetConfirmation => self.status = AppStatus::RestartingTask,
-                        _ => {}
+                        Popup::ResetConfirmation => {
+                            self.status = AppStatus::RestartingTask;
+                            self.active_popup = Some(Popup::ResetDone);
+                        }
+                        _ => self.active_popup = None,
                     }
                 } else {
                     self.active_popup = Some(Popup::RunConifrmation);
