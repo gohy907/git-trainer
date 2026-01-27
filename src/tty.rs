@@ -94,7 +94,8 @@ impl App {
             let parser = parser.clone();
             let exit_tx = exit_tx.clone();
             let handle = tokio::spawn(async move {
-                let mut buf = Vec::new();
+                use std::io::Write;
+
                 while let Some(item) = output_stream.next().await {
                     match item {
                         Ok(log) => {
@@ -106,11 +107,9 @@ impl App {
                             };
 
                             if !bytes.is_empty() {
-                                buf.extend_from_slice(bytes);
                                 if let Ok(mut p) = parser.write() {
-                                    p.process(&buf);
+                                    let _ = p.write_all(bytes);
                                 }
-                                buf.clear();
                             }
                         }
                         Err(e) => {
