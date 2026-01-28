@@ -8,6 +8,7 @@ pub struct Task {
     pub dir: String,
     pub status: TaskStatus,
     pub grade: Option<usize>,
+    pub extended_desc: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]

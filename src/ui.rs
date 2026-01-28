@@ -209,126 +209,6 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
     frame.render_stateful_widget(t, rect, &mut app.table_state);
 }
 
-fn render_popup(frame: &mut Frame, app: &App) {
-    match app.active_popup {
-        Some(ref popup) => {
-            let (popup_block, popup_content, block_area, content_area) = match popup {
-                Popup::RunConifrmation => {
-                    let lines_of_popup = vec![
-                        popup_line("Начать выполнение задания?", Color::LightBlue),
-                        popup_line("Enter — подтвердить, Esc — отменить", Color::LightBlue),
-                    ];
-
-                    let popup_block = Block::bordered()
-                        .fg(Color::LightBlue)
-                        .title("Подтвердите выбор")
-                        .title_alignment(Alignment::Center);
-
-                    let popup_content = Paragraph::new(lines_of_popup)
-                        .centered()
-                        .style(Style::default().fg(Color::LightBlue))
-                        .wrap(Wrap { trim: true });
-
-                    let area = popup_area(frame.area(), 40, 10);
-
-                    let aboba = popup_area(area, 40, 2);
-                    (popup_block, popup_content, area, aboba)
-                }
-                Popup::ResetConfirmation => {
-                    let lines_of_popup = vec![
-                        popup_line("Перезагрузить задание?", Color::LightBlue),
-                        popup_line("Вы потеряете все свои изменения.", Color::LightBlue),
-                        popup_line("Enter — подтвердить, Esc — отменить", Color::LightBlue),
-                    ];
-
-                    let popup_block = Block::bordered()
-                        .fg(Color::LightBlue)
-                        .title("Подтвердите перезагрузку")
-                        .title_alignment(Alignment::Center);
-
-                    let popup_content = Paragraph::new(lines_of_popup)
-                        .centered()
-                        .style(Style::default().fg(Color::LightBlue))
-                        .wrap(Wrap { trim: true });
-
-                    let area = popup_area(frame.area(), 40, 10);
-
-                    let aboba = popup_area(area, 40, 3);
-                    (popup_block, popup_content, area, aboba)
-                }
-                Popup::Error(error) => {
-                    let lines_of_popup = vec![
-                        popup_line(&error, Color::Red),
-                        popup_line("", Color::Red),
-                        popup_line("Обратитесь к преподавателю.", Color::Red),
-                    ];
-
-                    let popup_block = Block::bordered()
-                        .fg(Color::Red)
-                        .title("Ошибка!")
-                        .title_alignment(Alignment::Center);
-
-                    let popup_content = Paragraph::new(lines_of_popup)
-                        .centered()
-                        .style(Style::default().fg(Color::Red))
-                        .wrap(Wrap { trim: true });
-
-                    let area = popup_area(frame.area(), 60, 20);
-
-                    let aboba = popup_area(area, 58, 10);
-
-                    (popup_block, popup_content, area, aboba)
-                }
-                Popup::ResetDone => {
-                    let lines_of_popup = vec![
-                        popup_line("Задание перезагружено.", Color::LightGreen),
-                        popup_line("Нажмите Enter, чтобы продолжить", Color::LightGreen),
-                    ];
-
-                    let popup_block = Block::bordered()
-                        .fg(Color::LightGreen)
-                        .title_alignment(Alignment::Center);
-
-                    let popup_content = Paragraph::new(lines_of_popup)
-                        .centered()
-                        .style(Style::default().fg(Color::LightGreen))
-                        .wrap(Wrap { trim: true });
-
-                    let area = popup_area(frame.area(), 40, 10);
-                    let aboba = popup_area(area, 40, 3);
-                    (popup_block, popup_content, area, aboba)
-                }
-                _ => {
-                    let lines_of_popup = vec![popup_line(
-                        &app.config.tasks[app.task_under_cursor].desc,
-                        Color::LightBlue,
-                    )];
-
-                    let popup_block = Block::bordered()
-                        .fg(Color::LightBlue)
-                        .title_alignment(Alignment::Center);
-
-                    let popup_content = Paragraph::new(lines_of_popup)
-                        .centered()
-                        .style(Style::default().fg(Color::LightBlue))
-                        .wrap(Wrap { trim: true });
-
-                    let area = popup_area(frame.area(), 60, 20);
-
-                    let aboba = popup_area(area, 58, 10);
-
-                    (popup_block, popup_content, area, aboba)
-                }
-            };
-
-            frame.render_widget(Clear, block_area);
-            frame.render_widget(popup_block, block_area);
-            frame.render_widget(popup_content, content_area);
-        }
-        None => {}
-    }
-}
-
 #[derive(Clone)]
 pub enum Popup {
     RunConifrmation,
@@ -336,6 +216,112 @@ pub enum Popup {
     ResetDone,
     Error(String),
     Help,
+}
+
+struct PopupConfig {
+    title: Option<String>,
+    lines: Vec<Line<'static>>,
+    color: Color,
+    width: u16,
+    height: u16,
+}
+
+impl Popup {
+    fn config(&self, app: &App, frame: &mut Frame) -> PopupConfig {
+        match self {
+            Popup::RunConifrmation => PopupConfig {
+                title: Some("Подтвердите выбор".to_string()),
+                lines: vec![
+                    Line::from("Начать выполнение задания?").fg(Color::LightBlue),
+                    Line::from("Enter — подтвердить, Esc — отменить").fg(Color::LightBlue),
+                ],
+                color: Color::LightBlue,
+                width: frame.area().width * 1 / 3,
+                height: frame.area().height * 1 / 3,
+            },
+
+            Popup::ResetConfirmation => PopupConfig {
+                title: Some("Подтвердите перезагрузку".to_string()),
+                lines: vec![
+                    Line::from("Перезагрузить задание?").fg(Color::LightBlue),
+                    Line::from("Вы потеряете все свои изменения.").fg(Color::LightBlue),
+                    Line::from("Enter — подтвердить, Esc — отменить").fg(Color::LightBlue),
+                ],
+                color: Color::LightBlue,
+                width: frame.area().width * 1 / 3,
+                height: frame.area().height * 1 / 3,
+            },
+
+            Popup::Error(error) => PopupConfig {
+                title: Some("Ошибка!".to_string()),
+                lines: vec![
+                    Line::from(error.clone()).fg(Color::Red),
+                    Line::from(""),
+                    Line::from("Обратитесь к преподавателю.").fg(Color::Red),
+                ],
+                color: Color::Red,
+                width: frame.area().width * 2 / 3,
+                height: frame.area().height * 2 / 3,
+            },
+
+            Popup::ResetDone => PopupConfig {
+                title: None,
+                lines: vec![
+                    Line::from("Задание перезагружено.").fg(Color::LightGreen),
+                    Line::from("Нажмите Enter, чтобы продолжить").fg(Color::LightGreen),
+                ],
+                color: Color::LightGreen,
+                width: frame.area().width * 1 / 3,
+                height: frame.area().height * 1 / 3,
+            },
+
+            Popup::Help => {
+                let desc = &app.config.tasks[app.task_under_cursor].extended_desc;
+
+                let mut lines = Vec::new();
+
+                for line in desc {
+                    lines.push(Line::from(line.to_string()).fg(Color::LightBlue));
+                }
+                lines.push(Line::from(""));
+                lines.push(Line::from("Нажмите Enter, чтобы продолжить").fg(Color::LightBlue));
+                PopupConfig {
+                    title: None,
+                    lines: lines,
+                    color: Color::LightBlue,
+                    width: frame.area().width * 2 / 3,
+                    height: frame.area().height * 2 / 3,
+                }
+            }
+        }
+    }
+
+    pub fn render(&self, frame: &mut Frame, app: &App) {
+        let config = self.config(app, frame);
+        let lines_of_popup = config.lines;
+
+        let mut popup_block = Block::bordered()
+            .fg(config.color)
+            .title_alignment(Alignment::Center);
+
+        match config.title {
+            Some(title) => popup_block = popup_block.title(title),
+            None => {}
+        }
+
+        let popup_content = Paragraph::new(lines_of_popup)
+            .centered()
+            .style(Style::default().fg(config.color))
+            .wrap(Wrap { trim: true });
+
+        let area = popup_area(frame.area(), config.width, config.height);
+
+        let aboba = popup_area(area, config.width - 2, config.height / 2);
+
+        frame.render_widget(Clear, area);
+        frame.render_widget(popup_block, area);
+        frame.render_widget(popup_content, aboba);
+    }
 }
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
@@ -359,7 +345,9 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     frame.render_widget(title, global_layout[0]);
 
     render_table(frame, global_layout[1], app);
-    render_popup(frame, app);
+    if let Some(popup) = &app.active_popup {
+        popup.render(frame, app);
+    }
 }
 
 fn popup_area(area: Rect, x: u16, y: u16) -> Rect {
@@ -368,10 +356,6 @@ fn popup_area(area: Rect, x: u16, y: u16) -> Rect {
     let [area] = vertical.areas(area);
     let [area] = horizontal.areas(area);
     area
-}
-
-fn popup_line<'a>(s: &'a str, color: Color) -> Line<'a> {
-    Line::from(s).style(Style::default().fg(color))
 }
 
 pub fn ui_pty(f: &mut Frame, screen: &Screen, app: &mut App) {
@@ -399,5 +383,7 @@ pub fn ui_pty(f: &mut Frame, screen: &Screen, app: &mut App) {
     f.render_widget(pseudo_term, chunks[1]);
     f.render_widget(explanation, chunks[2]);
 
-    render_popup(f, app);
+    if let Some(popup) = &app.active_popup {
+        popup.render(f, app);
+    }
 }
