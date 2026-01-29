@@ -1,17 +1,14 @@
-use crate::app::event::Event;
 use crate::docker;
 use crate::io;
+use crate::popup::Popup;
 use crate::task::Task;
-use crate::ui;
-use crate::ui::Popup;
-use crossterm::event;
-use crossterm::event::KeyCode;
-use crossterm::event::KeyEvent;
-use crossterm::event::KeyEventKind;
 use ratatui::DefaultTerminal;
+use ratatui::Frame;
 use ratatui::widgets::TableState;
 use std::fs;
 use thiserror::Error;
+
+pub const VERSION: &str = "0.0.3";
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -63,6 +60,7 @@ pub enum AppStatus {
     Idling,
     RunningTask,
     RestartingTask,
+    ShowingAttempts,
     Exiting,
 }
 
@@ -79,6 +77,11 @@ impl Config {
     }
 }
 
+pub struct Attempt {
+    pub date: String,
+    pub grade: String,
+}
+
 // TODO: Rewrite tasks in struct
 pub struct App {
     pub table_state: TableState,
@@ -86,6 +89,8 @@ pub struct App {
     pub task_under_cursor: usize,
     pub status: AppStatus,
     pub active_popup: Option<Popup>,
+    pub attempts: Option<Vec<Attempt>>,
+    pub attempts_table_state: TableState,
 }
 
 #[cfg(debug_assertions)]
@@ -100,16 +105,58 @@ impl App {
         table_state.select(Some(0)); // стартуем с первой строки
         App {
             table_state: table_state,
+            attempts_table_state: table_state,
             config: { Config::load_config(INFO_PATH).expect("failed to load config") },
             task_under_cursor: 0,
             status: AppStatus::Idling,
             active_popup: None,
+            attempts: Some(vec![
+                Attempt {
+                    date: "Попытка от 01.01.26".to_string(),
+                    grade: "5/100".to_string(),
+                },
+                Attempt {
+                    date: "Попытка от 15.01.26".to_string(),
+                    grade: "23/100".to_string(),
+                },
+                Attempt {
+                    date: "Попытка от 20.01.26".to_string(),
+                    grade: "45/100".to_string(),
+                },
+                Attempt {
+                    date: "Попытка от 25.01.26".to_string(),
+                    grade: "67/100".to_string(),
+                },
+                Attempt {
+                    date: "Попытка от 29.01.26".to_string(),
+                    grade: "89/100".to_string(),
+                },
+            ]),
         }
+    }
+
+    pub fn render(&mut self, frame: &mut Frame) {
+        match self.status {
+            AppStatus::Idling => {
+                self.render_main_menu(frame);
+            }
+            _ => {}
+        }
+    }
+
+    pub fn handle_events(&mut self) -> io::Result<()> {
+        match self.status {
+            AppStatus::Idling => {
+                self.main_menu_handle_events()?;
+            }
+            _ => {}
+        };
+        Ok(())
     }
 
     pub async fn run_app(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while self.status != AppStatus::Exiting {
-            terminal.draw(|f| ui(f, self))?;
+            terminal.draw(|f| self.render(f))?;
             self.handle_events()?;
             match self.status {
                 AppStatus::RestartingTask => {
@@ -122,8 +169,7 @@ impl App {
                     self.status = AppStatus::Idling;
                 }
                 AppStatus::RunningTask => {
-                    let task = self.config.tasks[self.task_under_cursor].clone();
-
+                    let task = self.task_choosed();
                     match self.prepare_pty_bollard(terminal, &task).await {
                         Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
                         _ => {}
@@ -136,88 +182,7 @@ impl App {
         Ok(())
     }
 
-    fn handle_events(&mut self) -> io::Result<()> {
-        match event::read()? {
-            // it's important to check that the event is a key press event as
-            // crossterm also emits key release and repeat events on Windows.
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)
-            }
-            _ => {}
-        };
-        Ok(())
-    }
-
-    fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Char('q') => self.exit(),
-            KeyCode::Up => self.previous_row(),
-            KeyCode::Down => self.next_row(),
-            KeyCode::Enter => {
-                if let Some(popup) = self.active_popup.take() {
-                    match popup {
-                        Popup::RunConifrmation => self.status = AppStatus::RunningTask,
-                        Popup::ResetConfirmation => {
-                            self.status = AppStatus::RestartingTask;
-                            self.active_popup = Some(Popup::ResetDone);
-                        }
-                        _ => self.active_popup = None,
-                    }
-                } else {
-                    self.active_popup = Some(Popup::RunConifrmation);
-                }
-            }
-            KeyCode::Char('r') => {
-                self.active_popup = Some(Popup::ResetConfirmation);
-            }
-
-            KeyCode::Esc => {
-                self.active_popup = None;
-            }
-            _ => {}
-        }
-    }
-
-    pub fn next_row(&mut self) {
-        if self.is_popup_active() {
-            return;
-        }
-        let i = match self.table_state.selected() {
-            Some(i) if i + 1 < self.config.tasks.len() => i + 1,
-            _ => 0,
-        };
-        self.table_state.select(Some(i));
-        self.task_under_cursor = i;
-    }
-
-    pub fn previous_row(&mut self) {
-        if self.is_popup_active() {
-            return;
-        }
-        match &self.active_popup {
-            Some(popup) => match popup {
-                Popup::Error(_) => return,
-                _ => {}
-            },
-            _ => {}
-        }
-        let len = self.config.tasks.len();
-        let i = match self.table_state.selected() {
-            Some(0) | None => len - 1,
-            Some(i) => i - 1,
-        };
-        self.table_state.select(Some(i));
-        self.task_under_cursor = i;
-    }
-
-    fn exit(&mut self) {
-        self.status = AppStatus::Exiting;
-    }
-
-    fn is_popup_active(&self) -> bool {
-        match self.active_popup {
-            Some(_) => true,
-            _ => false,
-        }
+    pub fn task_choosed(&self) -> Task {
+        self.config.tasks[self.task_under_cursor].clone()
     }
 }

@@ -1,12 +1,12 @@
 mod app;
 mod docker;
+mod main_menu;
+mod popup;
+mod pty;
 mod task;
-mod tty;
-mod ui;
 use crate::app::{App, AppStatus};
 use crate::docker::create_task_container;
 use crate::task::TaskStatus;
-use crate::ui::ui;
 use ratatui::Frame;
 use std::io;
 
@@ -15,7 +15,6 @@ async fn run() -> bool {
     let _ = color_eyre::install();
 
     let mut app = App::new();
-
     let _ = app.run_app(&mut terminal).await;
 
     match app.status {

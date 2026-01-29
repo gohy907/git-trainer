@@ -1,22 +1,30 @@
-use crate::App;
+use crate::Frame;
+use crate::app::{App, VERSION};
+use crate::docker;
+use crate::docker::resize_container;
+use crossterm::event;
+use crossterm::event::{Event, KeyEventKind};
+use ratatui::layout::{Alignment, Constraint};
+use ratatui::prelude::{Direction, Layout};
+use ratatui::style::{Modifier, Style, Stylize};
+use ratatui::text::Line;
+use ratatui::widgets::{Block, Borders, Paragraph};
+use tui_term::{vt100, widget::PseudoTerminal};
+use vt100::Screen;
+
 use crate::task::Task;
-use crate::ui::{self, Popup};
 use bytes::Bytes;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::DefaultTerminal;
 use std::{
-    io::{self},
+    io,
     sync::{Arc, RwLock, mpsc::Sender},
     time::Duration,
 };
-use thiserror::Error;
-use tui_term::vt100;
 
 use bollard::container::LogOutput;
 use futures::StreamExt;
+use thiserror::Error;
 use tokio::io::AsyncWriteExt;
-
-use crate::docker::{self, resize_container};
 
 #[derive(Debug)]
 struct Size {
@@ -55,6 +63,36 @@ pub enum RunPtyError {
 }
 
 impl App {
+    pub fn render_pty(&mut self, frame: &mut Frame, screen: &Screen) {
+        let title = Line::from(format!("git-trainer v{}", VERSION).bold()).centered();
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Length(1),
+                    Constraint::Min(1),
+                    Constraint::Length(1),
+                ]
+                .as_ref(),
+            )
+            .split(frame.area());
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .style(Style::default().add_modifier(Modifier::BOLD));
+        let pseudo_term = PseudoTerminal::new(screen).block(block);
+        let explanation = "Напишите команду exit для выхода".to_string();
+        let explanation = Paragraph::new(explanation)
+            .style(Style::default())
+            .alignment(Alignment::Center);
+        frame.render_widget(title, chunks[0]);
+        frame.render_widget(pseudo_term, chunks[1]);
+        frame.render_widget(explanation, chunks[2]);
+
+        if let Some(popup) = &self.active_popup {
+            popup.render(frame, self);
+        }
+    }
+
     pub async fn prepare_pty_bollard(
         &mut self,
         terminal: &mut DefaultTerminal,
@@ -165,7 +203,7 @@ impl App {
                 return Ok(());
             }
 
-            terminal.draw(|f| ui::ui_pty(f, parser.read().unwrap().screen(), self))?;
+            terminal.draw(|f| self.render_pty(f, parser.read().unwrap().screen()))?;
 
             if event::poll(Duration::from_millis(10))? {
                 match event::read()? {
@@ -191,64 +229,6 @@ impl App {
                     }
                     _ => {}
                 }
-            }
-        }
-    }
-
-    fn handle_popup_key(&mut self, key: KeyCode) -> Result<(), std::sync::mpsc::SendError<Bytes>> {
-        match key {
-            KeyCode::Enter => {
-                self.active_popup = None;
-                Ok(())
-            }
-            _ => Ok(()),
-        }
-    }
-
-    fn handle_terminal_key(
-        &mut self,
-        key: KeyCode,
-        modifiers: KeyModifiers,
-        sender: &Sender<Bytes>,
-    ) -> Result<(), std::sync::mpsc::SendError<Bytes>> {
-        if modifiers == KeyModifiers::CONTROL {
-            match key {
-                KeyCode::Char('c') => sender.send(Bytes::from(vec![3])),
-                KeyCode::Char('v') => sender.send(Bytes::from(vec![22])),
-                KeyCode::Char('d') => sender.send(Bytes::from(vec![4])),
-                KeyCode::Char('z') => sender.send(Bytes::from(vec![26])),
-                KeyCode::Char('l') => sender.send(Bytes::from(vec![12])),
-                KeyCode::Char('h') => {
-                    self.active_popup = Some(Popup::Help);
-                    Ok(())
-                }
-                _ => Ok(()),
-            }
-        } else {
-            match key {
-                KeyCode::Char(input) => sender.send(Bytes::from(input.to_string().into_bytes())),
-                KeyCode::Backspace => sender.send(Bytes::from(vec![8])),
-                KeyCode::Enter => {
-                    #[cfg(unix)]
-                    sender.send(Bytes::from(vec![b'\n']))?;
-                    #[cfg(windows)]
-                    sender.send(Bytes::from(vec![b'\r', b'\n']))?;
-                    Ok(())
-                }
-                KeyCode::Left => sender.send(Bytes::from(vec![27, 91, 68])),
-                KeyCode::Right => sender.send(Bytes::from(vec![27, 91, 67])),
-                KeyCode::Up => sender.send(Bytes::from(vec![27, 91, 65])),
-                KeyCode::Down => sender.send(Bytes::from(vec![27, 91, 66])),
-                KeyCode::Home => sender.send(Bytes::from(vec![27, 91, 72])),
-                KeyCode::End => sender.send(Bytes::from(vec![27, 91, 70])),
-                KeyCode::PageUp => sender.send(Bytes::from(vec![27, 91, 53, 126])),
-                KeyCode::PageDown => sender.send(Bytes::from(vec![27, 91, 54, 126])),
-                KeyCode::Tab => sender.send(Bytes::from(vec![9])),
-                KeyCode::BackTab => sender.send(Bytes::from(vec![27, 91, 90])),
-                KeyCode::Delete => sender.send(Bytes::from(vec![27, 91, 51, 126])),
-                KeyCode::Insert => sender.send(Bytes::from(vec![27, 91, 50, 126])),
-                KeyCode::Esc => sender.send(Bytes::from(vec![27])),
-                _ => Ok(()),
             }
         }
     }
