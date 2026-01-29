@@ -11,45 +11,9 @@ Git репозиторий и сделать в нём первый коммит
 """
 extended_desc = [
 "Давайте начнём с чего-нибудь лёгкого.",
-"Создайте в папке новый Git репозиторий и сделайте в нём какой-либо начальный коммит."
+"Создайте в папке \"hello-world\" новый Git репозиторий, в котором напишите код на C, выводящий на экран строчку \"Hello, World!\".",
+"После этого сделайте ровно один коммит, добавляющий этот код, с названием \"Initial commit\"."
 ]
 work_name = "hello-world"
 dir = "basics"
 status = "in_progress"
-
-[[tasks]]
-name = "Абоба"
-desc = """
-a
-"""
-work_name = "ab"
-dir = "a"
-status = "approved"
-grade = 5
-
-[[tasks]]
-name = "Абоба"
-desc = """
-a
-"""
-work_name = "ab"
-dir = "a"
-status = "pending"
-
-[[tasks]]
-name = "Абоба"
-desc = """
-a
-"""
-work_name = "ab"
-dir = "a"
-status = "done"
-
-[[tasks]]
-name = "Абоба"
-desc = """
-a
-"""
-work_name = "ab"
-dir = "a"
-status = "not_in_progress"
