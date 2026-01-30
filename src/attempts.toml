@@ -1,0 +1,39 @@
+# attempts.toml
+
+# Попытки для задания "Привет, мир!"
+[[tasks."hello-world".attempts]]
+grade = 45
+timestamp = "2026-01-30T15:30:00+04:00"
+tests = [
+    { id = 1, description = "aboba1", passed = false },
+    { id = 2, description = "aboba2", passed = true },
+    { id = 3, description = "aboba3", passed = false },
+]
+
+[[tasks."hello-world".attempts]]
+grade = 85
+timestamp = "2026-01-30T16:15:00+04:00"
+tests = [
+    { id = 1,description = "aboba4", passed = true },
+    { id = 2, description = "aboba5", passed = true },
+    { id = 3, description = "aboba6", passed = true },
+]
+
+
+[[tasks."hello-world".attempts]]
+grade = 85
+timestamp = "2026-01-30T16:15:00+04:00"
+tests = [
+    { id = 1, description = "Коммит в репозитории ровно один", passed = true },
+    { id = 2, description = "Код компилируется", passed = true },
+    { id = 3, description = "Вывод 'Hello, World!'", passed = true },
+]
+
+# Попытки для другого задания
+# [[tasks."Git основы".attempts]]
+# grade = 30
+# timestamp = "2026-01-29T14:00:00+04:00"
+# tests = [
+#     { id = 1, description = "Репозиторий инициализирован", passed = true },
+#     { id = 2, description = "Есть коммиты", passed = false },
+# ]

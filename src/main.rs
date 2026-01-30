@@ -1,9 +1,11 @@
 mod app;
+mod attempt_manager;
 mod docker;
 mod main_menu;
 mod popup;
 mod pty;
 mod task;
+mod test;
 use crate::app::{App, AppStatus};
 use crate::docker::create_task_container;
 use crate::task::TaskStatus;

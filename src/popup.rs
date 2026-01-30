@@ -44,7 +44,7 @@ impl Popup {
             },
 
             Popup::ResetConfirmation => PopupConfig {
-                title: Some("Подтвердрите перезагрузку".to_string()),
+                title: Some("Подтвердите перезагрузку".to_string()),
                 lines: vec![
                     Line::from("Перезагрузить задание?").fg(Color::LightBlue),
                     Line::from("Вы потеряете все свои изменения.").fg(Color::LightBlue),
