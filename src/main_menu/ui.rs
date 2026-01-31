@@ -172,6 +172,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
         let item = [
             data.name.clone(),
             wrapped_desc,
+            // "a\nb".to_string(),
             status_str.to_string(),
             // match data.grade {
             //     Some(grade) => format!("{}/100", grade.to_string()),

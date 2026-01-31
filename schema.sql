@@ -34,45 +34,65 @@ FOREIGN KEY (attempt_id) REFERENCES attempts (id) ON DELETE CASCADE
 ) ;
 
 
-INSERT INTO users (
-id,
-username,
-created_at)
-VALUES (
-1,
-'gohy',
-2
-) ;
+-- INSERT INTO users (
+-- id,
+-- username,
+-- created_at)
+-- VALUES (
+-- 1,
+-- 'gohy',
+-- 2
+-- ) ;
+--
+-- INSERT INTO tasks (
+-- id,
+-- name,
+-- work_name,
+-- description,
+-- extended_description,
+-- status
+-- )
+-- VALUES (
+-- 1,
+-- 'Привет, мир!',
+-- 'hello-world',
+-- 'В этой задаче Вам предстоит создать новый Git репозиторий и сделать в нём первый коммит.',
+-- 'Давайте начнём с чего-нибудь лёгкого.\n
+--     Создайте в папке "hello-world" новый Git репозиторий, в котором напишите код на C, выводящий на экран строчку "Hello, World!".\n 
+--     После этого сделайте ровно один коммит, добавляющий этот код, с названием "Initial commit".',
+-- 0
+-- ) ;
 
-INSERT INTO tasks (
-id,
-name,
-work_name,
-description,
-extended_description,
-status
-)
-VALUES (
-1,
-'Привет, мир!',
-'hello-world',
-'В этой задаче Вам предстоит создать новый\n
-    Git репозиторий и сделать в нём первый коммит.',
-'Давайте начнём с чего-нибудь лёгкого.\n
-    Создайте в папке "hello-world" новый Git репозиторий, в котором напишите код на C, выводящий на экран строчку "Hello, World!".\n 
-    После этого сделайте ровно один коммит, добавляющий этот код, с названием "Initial commit".',
-0
-) ;
 
-INSERT INTO attempts (
-id,
-user_id,
-task_id,
-passed,
-timestamp)
-VALUES (
-1,
-1,
-1,
-1,
-1) ;
+-- INSERT INTO tasks (
+-- id,
+-- name,
+-- work_name,
+-- description,
+-- extended_description,
+-- status
+-- )
+-- VALUES (
+-- 2,
+-- 'Привет, мир!',
+-- 'hello-world',
+-- 'В этой задаче Вам предстоит создать новый\n
+--     Git репозиторий и сделать в нём первый коммит.',
+-- 'Давайте начнём с чего-нибудь лёгкого.\n
+--     Создайте в папке "hello-world" новый Git репозиторий, в котором напишите код на C, выводящий на экран строчку "Hello, World!".\n 
+--     После этого сделайте ровно один коммит, добавляющий этот код, с названием "Initial commit".',
+-- 0
+-- ) ;
+
+-- INSERT INTO attempts (
+-- id,
+-- user_id,
+-- task_id,
+-- passed,
+-- timestamp)
+-- VALUES (
+-- 1,
+-- 1,
+-- 1,
+-- 1,
+-- 1) ;

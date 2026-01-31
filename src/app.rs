@@ -149,7 +149,7 @@ impl App {
 
     pub async fn run_app(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while self.status != AppStatus::Exiting {
-            self.status = AppStatus::ShowingAttempts;
+            // self.status = AppStatus::ShowingAttempts;
             terminal.draw(|f| self.render(f))?;
             self.handle_events()?;
             match self.status {
