@@ -52,7 +52,10 @@ impl Task for TaskModel {
         }
     }
     fn container_name(&self) -> String {
-        let username = whoami::username().unwrap_or("UNKNOWN".to_string());
+        let username = whoami::username()
+            .expect("While getting username:")
+            .to_string()
+            .replace(" ", "-");
         format!("git-trainer_{}_{}", self.work_name, username)
     }
     fn image_name(&self) -> String {
