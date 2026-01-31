@@ -71,6 +71,7 @@ pub async fn create_task_container<T: Task>(task: &T) -> Result<String, bollard:
     let config = ContainerCreateBody {
         image: Some(task.image_name()),
         tty: Some(true),
+        hostname: Some(task.work_name()),
         attach_stdin: Some(true),
         attach_stdout: Some(true),
         attach_stderr: Some(true),
