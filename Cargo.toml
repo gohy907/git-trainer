@@ -1,27 +1,10 @@
-[package]
-name = "git-trainer"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "2"
+members = [
+    "tui",
+    # "cli"
+]
 
-[dependencies]
-bollard = "0.19.4"
-vt100 = "0.16.2"
-libc = "0.2.180"
-bytes = "1.11.0"
-color-eyre = "0.6.5"
-crossterm = "0.29.0"
-futures-util = "0.3.31"
-nix = {version = "0.30.1", features = ["user"]}
-portable-pty = "0.9.0"
-ratatui = "0.30.0"
-serde = "1.0.228"
-style = "0.1.0"
-textwrap = "0.16.2"
-thiserror = "2.0.17"
-tokio = {version = "1.48.0", features = ["full"]}
-toml = "0.9.10"
-tui-term = "0.3.0"
-futures = "0.3.31"
-chrono = {version = "0.4.43", features = ["serde"]}
-rusqlite = "0.38.0"
-whoami = "2.1.0"
+[workspace.package]
+version = "0.1.0"
+edition = "2021"

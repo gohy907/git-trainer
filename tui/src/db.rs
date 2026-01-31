@@ -136,6 +136,14 @@ impl Repo {
         )
     }
 
+    pub fn get_tasks_count(&self) -> Result<usize> {
+        let count: i64 = self
+            .connection
+            .query_row("SELECT COUNT(*) FROM tasks", [], |row| row.get(0))?;
+
+        Ok(count as usize)
+    }
+
     pub fn get_user_by_username(&self, username: &str) -> Result<User> {
         let conn = &self.connection;
         conn.query_row(

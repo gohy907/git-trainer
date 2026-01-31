@@ -69,13 +69,15 @@ impl App {
             },
             _ => {}
         }
-        let len = self
-            .repo
-            .get_all_tasks()
-            .expect("While working with db:")
-            .len();
+        let len = self.repo.get_tasks_count().unwrap_or(0);
         let i = match self.table_state.selected() {
-            Some(0) | None => len - 1,
+            Some(0) | None => {
+                if len != 0 {
+                    len - 1
+                } else {
+                    0
+                }
+            }
             Some(i) => i - 1,
         };
         self.table_state.select(Some(i));

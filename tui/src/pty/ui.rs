@@ -219,7 +219,7 @@ impl App {
                     Event::Resize(cols, rows) => {
                         let rows = rows - 4;
                         let cols = cols - 2;
-                        parser.write().unwrap().set_size(rows, cols);
+                        parser.write().unwrap().screen_mut().set_size(rows, cols);
                         let name = container_name.clone();
 
                         let handle = tokio::spawn(async move {
