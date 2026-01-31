@@ -45,7 +45,9 @@ fn docker_connect() -> Result<Docker, bollard::errors::Error> {
     Docker::connect_with_socket_defaults()
 }
 
-pub async fn ensure_container_running<T: Task>(task: &T) -> Result<(), bollard::errors::Error> {
+pub async fn ensure_task_container_running<T: Task>(
+    task: &T,
+) -> Result<(), bollard::errors::Error> {
     let docker = docker_connect()?;
 
     let exists = match docker
@@ -62,7 +64,7 @@ pub async fn ensure_container_running<T: Task>(task: &T) -> Result<(), bollard::
     };
 
     if !exists {
-        create_task_container(task).await?;
+        ensure_task_container_created(task).await?;
     }
 
     start_container(task).await?;
@@ -72,23 +74,6 @@ pub async fn ensure_container_running<T: Task>(task: &T) -> Result<(), bollard::
 
 pub async fn create_task_container<T: Task>(task: &T) -> Result<String, bollard::errors::Error> {
     let docker = docker_connect()?;
-
-    // eprintln!("{}", &task.work_name);
-    match docker
-        .inspect_container(&task.container_name(), None::<InspectContainerOptions>)
-        .await
-    {
-        Ok(info) => {
-            return Ok(info.id.unwrap());
-        }
-        Err(bollard::errors::Error::DockerResponseServerError { status_code, .. })
-            if status_code == 404 => {}
-        Err(e) => {
-            return Err(e.into());
-        }
-    }
-
-    // eprintln!("{}", &task.work_name);
     let create_opts = CreateContainerOptionsBuilder::new()
         .name(&task.container_name())
         .build();
@@ -108,6 +93,28 @@ pub async fn create_task_container<T: Task>(task: &T) -> Result<String, bollard:
     let created = docker.create_container(Some(create_opts), config).await?;
 
     Ok(created.id)
+}
+
+pub async fn ensure_task_container_created<T: Task>(
+    task: &T,
+) -> Result<String, bollard::errors::Error> {
+    let docker = docker_connect()?;
+
+    // eprintln!("{}", &task.work_name);
+    match docker
+        .inspect_container(&task.container_name(), None::<InspectContainerOptions>)
+        .await
+    {
+        Ok(info) => {
+            return Ok(info.id.unwrap());
+        }
+        Err(bollard::errors::Error::DockerResponseServerError { status_code, .. })
+            if status_code == 404 => {}
+        Err(e) => {
+            return Err(e.into());
+        }
+    }
+    create_task_container(task).await
 }
 
 // TODO: REMOVE 'BASICS' DIRECTORY FROM TASKS, IT'S REDUNDANT FOR NOW
