@@ -1,6 +1,7 @@
 use crate::TaskStatus;
 use crate::app::App;
 use crate::app::VERSION;
+use crate::db::Task;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize, palette::tailwind};
@@ -104,7 +105,7 @@ impl TableColors {
 
 fn get_max_task_name_length(app: &App) -> usize {
     let mut max = usize::min_value();
-    for task in &app.config.tasks {
+    for task in app.repo.get_all_tasks().expect("While working with db:") {
         if task.name.chars().count() > max {
             max = task.name.chars().count();
         }
@@ -150,14 +151,14 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
         .map(Cell::from)
         .collect::<Row>()
         .height(1);
-
-    let rows = app.config.tasks.iter().enumerate().map(|(i, data)| {
+    let binding = app.repo.get_all_tasks().expect("While working with db: ");
+    let rows = binding.iter().enumerate().map(|(i, data)| {
         let row_bg = match i % 2 {
             0 => colors.normal_row_color,
             _ => colors.alt_row_color,
         };
 
-        let status_str = match data.status {
+        let status_str = match data.status() {
             TaskStatus::NotInProgress => "НЕ НАЧАТО",
             TaskStatus::InProgress => "НАЧАТО",
             TaskStatus::Done => "СДЕЛАНО",
@@ -167,15 +168,15 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
 
         let cell_height = 4;
 
-        let wrapped_desc = wrap(&data.desc, LINE_WIDTH as usize, cell_height);
+        let wrapped_desc = wrap(&data.description(), LINE_WIDTH as usize, cell_height);
         let item = [
             data.name.clone(),
             wrapped_desc,
             status_str.to_string(),
-            match data.grade {
-                Some(grade) => format!("{}/100", grade.to_string()),
-                None => "Нет оценки".to_string(),
-            },
+            // match data.grade {
+            //     Some(grade) => format!("{}/100", grade.to_string()),
+            //     None => "Нет оценки".to_string(),
+            // },
         ];
 
         let cells = item.into_iter().enumerate().map(|(col, content)| {
@@ -183,7 +184,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
                 Cell::from(Text::from(content)).style(Style::new().fg(Color::White).bg(row_bg));
 
             if col == 2 {
-                let status_color = match data.status {
+                let status_color = match data.status() {
                     TaskStatus::NotInProgress => Color::Red,
                     TaskStatus::InProgress => Color::Yellow,
                     TaskStatus::Done => Color::Blue,

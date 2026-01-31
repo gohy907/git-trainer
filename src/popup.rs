@@ -1,5 +1,6 @@
 use crate::App;
 use crate::Frame;
+use crate::db::Task;
 use ratatui::layout::Constraint;
 use ratatui::layout::{Alignment, Flex};
 use ratatui::prelude::{Layout, Rect};
@@ -79,11 +80,11 @@ impl Popup {
             },
 
             Popup::Help => {
-                let desc = &app.config.tasks[app.task_under_cursor].extended_desc;
+                // let desc = &app.config.tasks[app.task_under_cursor].extended_desc;
 
                 let mut lines = Vec::new();
 
-                for line in desc {
+                for line in app.task_choosed().extended_description().lines() {
                     lines.push(Line::from(line.to_string()).fg(Color::LightBlue));
                 }
                 lines.push(Line::from(""));

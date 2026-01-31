@@ -1,15 +1,14 @@
+use crate::db::Attempt;
+use crate::db::Repo;
+use crate::db::Task;
+use crate::db::Test;
 use crate::docker;
 use crate::io;
 use crate::popup::Popup;
-use crate::task::Task;
-use crate::test::Test;
-use chrono::{DateTime, Utc};
 use ratatui::DefaultTerminal;
 use ratatui::Frame;
 use ratatui::widgets::{ListState, ScrollbarState, TableState};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs;
 use thiserror::Error;
 
 pub const VERSION: &str = "0.0.3";
@@ -54,55 +53,11 @@ pub enum LoadingConfigError {
     IOError(#[from] io::Error),
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct AttemptRepo {
-    pub tasks: HashMap<String, TaskAttempts>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct TaskAttempts {
-    pub attempts: Vec<Attempt>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Attempt {
-    pub grade: u32,
-    pub timestamp: DateTime<Utc>,
-    pub tests: Vec<TestResult>,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TestResult {
     pub id: usize,
     pub description: String,
     pub passed: bool,
-}
-
-impl AttemptRepo {
-    pub fn load(path: &str) -> Result<Self, LoadingConfigError> {
-        let text = fs::read_to_string(path).unwrap_or_else(|_| String::from("")); // пустой файл если не существует
-
-        if text.is_empty() {
-            Ok(AttemptRepo::default())
-        } else {
-            Ok(toml::from_str::<AttemptRepo>(&text)?)
-        }
-    }
-
-    pub fn save(&self, path: &str) -> Result<(), SavingConfigError> {
-        let toml_str = toml::to_string_pretty(&self)?;
-        fs::write(path, toml_str)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Config {
-    pub first_time: bool,
-    pub first_time_desc: String,
-    pub tasks: Vec<Task>,
-    #[serde(skip)]
-    pub attempt_repo: AttemptRepo,
 }
 
 #[derive(PartialEq)]
@@ -112,30 +67,6 @@ pub enum AppStatus {
     RestartingTask,
     ShowingAttempts,
     Exiting,
-}
-
-impl Config {
-    pub fn load_config(path: &str) -> Result<Self, LoadingConfigError> {
-        // Загружаем основной конфиг
-        let info_text = fs::read_to_string(path)?;
-        let mut config = toml::from_str::<Config>(&info_text)?;
-
-        // Загружаем attempt_repo из другого файла
-        config.attempt_repo = AttemptRepo::load(ATTEMPTS_REPO_PATH)?;
-
-        Ok(config)
-    }
-
-    pub fn save_config(&self) -> Result<(), SavingConfigError> {
-        // Сохраняем основной конфиг (без attempt_repo)
-        let toml_str = toml::to_string_pretty(&self)?;
-        fs::write(INFO_PATH, toml_str)?;
-
-        // Сохраняем attempt_repo отдельно
-        self.attempt_repo.save(ATTEMPTS_REPO_PATH)?;
-
-        Ok(())
-    }
 }
 
 pub struct AttemptsTableConfig {
@@ -156,15 +87,15 @@ impl AttemptsTableConfig {
 
 // TODO: Rewrite tasks in struct
 pub struct App {
+    pub user: String,
+    pub repo: Repo,
     pub table_state: TableState,
-    pub config: Config,
     pub task_under_cursor: usize,
     pub status: AppStatus,
     pub active_popup: Option<Popup>,
 
     pub attempts_table_config: AttemptsTableConfig,
 
-    pub tests: Option<Vec<Test>>,
     pub tests_list_state: ListState,
     pub tests_scrollbar_state: ScrollbarState,
 }
@@ -186,13 +117,13 @@ impl App {
         let mut table_state = TableState::default();
         table_state.select(Some(0));
         App {
+            user: whoami::username().expect("Can't get username"),
+            repo: Repo::init_database(),
             table_state: table_state,
             attempts_table_config: AttemptsTableConfig::default(),
-            config: { Config::load_config(INFO_PATH).expect("failed to load config") },
             task_under_cursor: 0,
             status: AppStatus::Idling,
             active_popup: None,
-            tests: None,
             tests_list_state: ListState::default(),
             tests_scrollbar_state: ScrollbarState::default(),
         }
@@ -218,13 +149,12 @@ impl App {
 
     pub async fn run_app(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while self.status != AppStatus::Exiting {
-            // self.status = AppStatus::ShowingAttempts;
+            self.status = AppStatus::ShowingAttempts;
             terminal.draw(|f| self.render(f))?;
             self.handle_events()?;
             match self.status {
                 AppStatus::RestartingTask => {
-                    let task = &mut self.config.tasks[self.task_under_cursor];
-                    match docker::restart_task(task).await {
+                    match docker::restart_task(&self.task_choosed()).await {
                         Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
 
                         _ => {}
@@ -232,8 +162,10 @@ impl App {
                     self.status = AppStatus::Idling;
                 }
                 AppStatus::RunningTask => {
-                    let task = self.task_choosed();
-                    match self.prepare_pty_bollard(terminal, &task).await {
+                    match self
+                        .prepare_pty_bollard(terminal, &self.task_choosed())
+                        .await
+                    {
                         Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
                         _ => {}
                     }
@@ -245,11 +177,28 @@ impl App {
         Ok(())
     }
 
-    pub fn task_choosed(&self) -> Task {
-        self.config.tasks[self.task_under_cursor].clone()
+    pub fn task_choosed(&self) -> impl Task + use<> {
+        self.repo.get_all_tasks().expect("While working with db:")[self.task_under_cursor].clone()
     }
 
-    pub fn submitted_attempts(&self) -> &Vec<Attempt> {
-        &self.config.attempt_repo.tasks[&self.task_choosed().work_name].attempts
+    pub fn get_attempts_of_task(&self) -> Vec<Attempt> {
+        let task = self.task_choosed();
+        self.repo
+            .get_task_attempts(task.id())
+            .expect("While working with db:")
+    }
+
+    pub fn get_tests_of_attempt(&self) -> Vec<Test> {
+        let attempt = self.get_attempts_of_task();
+        if attempt.is_empty() {
+            return Vec::new();
+        }
+        self.repo
+            .get_attempt_tests(
+                attempt[self.attempts_table_config.attempt_under_cursor]
+                    .id
+                    .expect("While working with db:"),
+            )
+            .expect("While working with db:")
     }
 }

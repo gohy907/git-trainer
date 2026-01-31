@@ -5,7 +5,7 @@ use std::io;
 impl App {
     // Прокрутка вниз
     fn next_attempt(&mut self) {
-        let attempts = self.submitted_attempts();
+        let attempts = self.get_attempts_of_task();
         let i = match self.attempts_table_config.attempts_table_state.selected() {
             Some(i) => {
                 if i >= attempts.len() - 1 {
@@ -24,7 +24,7 @@ impl App {
 
     // Прокрутка вверх
     fn previous_attempt(&mut self) {
-        let attempts = self.submitted_attempts();
+        let attempts = self.get_attempts_of_task();
         let i = match self.attempts_table_config.attempts_table_state.selected() {
             Some(i) => {
                 if i == 0 {
@@ -56,45 +56,43 @@ impl App {
         Ok(())
     }
     fn next_test(&mut self) {
-        if let Some(tests) = &self.tests {
-            if tests.is_empty() {
-                return;
-            }
-
-            let i = match self.tests_list_state.selected() {
-                Some(i) => {
-                    if i >= tests.len() - 1 {
-                        0
-                    } else {
-                        i + 1
-                    }
-                }
-                None => 0,
-            };
-            self.tests_list_state.select(Some(i));
-            self.tests_scrollbar_state = self.tests_scrollbar_state.position(i);
+        let tests = &self.get_tests_of_attempt();
+        if tests.is_empty() {
+            return;
         }
+
+        let i = match self.tests_list_state.selected() {
+            Some(i) => {
+                if i >= tests.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.tests_list_state.select(Some(i));
+        self.tests_scrollbar_state = self.tests_scrollbar_state.position(i);
     }
 
     fn previous_test(&mut self) {
-        if let Some(tests) = &self.tests {
-            if tests.is_empty() {
-                return;
-            }
-
-            let i = match self.tests_list_state.selected() {
-                Some(i) => {
-                    if i == 0 {
-                        tests.len() - 1
-                    } else {
-                        i - 1
-                    }
-                }
-                None => 0,
-            };
-            self.tests_list_state.select(Some(i));
-            self.tests_scrollbar_state = self.tests_scrollbar_state.position(i);
+        let tests = &self.get_tests_of_attempt();
+        if tests.is_empty() {
+            return;
         }
+
+        let i = match self.tests_list_state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    tests.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.tests_list_state.select(Some(i));
+        self.tests_scrollbar_state = self.tests_scrollbar_state.position(i);
     }
 
     pub fn tests_handle_events(&mut self) -> io::Result<()> {
@@ -111,11 +109,10 @@ impl App {
                     self.tests_scrollbar_state = self.tests_scrollbar_state.position(0);
                 }
                 KeyCode::End | KeyCode::Char('G') => {
-                    if let Some(tests) = &self.tests {
-                        let last = tests.len() - 1;
-                        self.tests_list_state.select(Some(last));
-                        self.tests_scrollbar_state = self.tests_scrollbar_state.position(last);
-                    }
+                    let tests = &self.get_tests_of_attempt();
+                    let last = tests.len() - 1;
+                    self.tests_list_state.select(Some(last));
+                    self.tests_scrollbar_state = self.tests_scrollbar_state.position(last);
                 }
                 _ => {}
             }

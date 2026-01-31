@@ -12,7 +12,7 @@ use ratatui::widgets::{Block, Borders, Paragraph};
 use tui_term::{vt100, widget::PseudoTerminal};
 use vt100::Screen;
 
-use crate::task::Task;
+use crate::db::Task;
 use bytes::Bytes;
 use ratatui::DefaultTerminal;
 use std::{
@@ -93,10 +93,10 @@ impl App {
         }
     }
 
-    pub async fn prepare_pty_bollard(
+    pub async fn prepare_pty_bollard<T: Task>(
         &mut self,
         terminal: &mut DefaultTerminal,
-        task: &Task,
+        task: &T,
     ) -> Result<(), PreparePtyError> {
         let mut handles = Vec::new();
         let size = Size {

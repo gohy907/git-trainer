@@ -1,4 +1,4 @@
-use crate::task::Task;
+use crate::db::Task;
 use bollard::Docker;
 use bollard::body_full;
 use bollard::container::AttachContainerResults;
@@ -45,7 +45,7 @@ fn docker_connect() -> Result<Docker, bollard::errors::Error> {
     Docker::connect_with_socket_defaults()
 }
 
-pub async fn create_task_container(task: &Task) -> Result<String, bollard::errors::Error> {
+pub async fn create_task_container<T: Task>(task: &T) -> Result<String, bollard::errors::Error> {
     let docker = docker_connect()?;
 
     // eprintln!("{}", &task.work_name);
@@ -84,22 +84,18 @@ pub async fn create_task_container(task: &Task) -> Result<String, bollard::error
     Ok(created.id)
 }
 
-pub async fn build_task_image(task: &Task) -> Result<(), BuildError> {
+// TODO: REMOVE 'BASICS' DIRECTORY FROM TASKS, IT'S REDUNDANT FOR NOW
+pub async fn build_task_image<T: Task>(task: &T) -> Result<(), BuildError> {
     let docker = docker_connect()?;
 
-    let name_of_image = task.image_name();
+    let name_of_image = task.image_name().clone();
 
     let build_options = BuildImageOptionsBuilder::new()
         .dockerfile("src/Dockerfile")
         .t(&name_of_image)
         .build();
 
-    let mut file = File::open(
-        tasks_root()
-            .join(&task.dir)
-            .join(&task.work_name)
-            .join("src.tar.gz"),
-    )?;
+    let mut file = File::open(tasks_root().join(&task.work_name()).join("src.tar.gz"))?;
     let mut contents = Vec::new();
     file.read_to_end(&mut contents)?;
 
@@ -119,7 +115,7 @@ pub async fn build_task_image(task: &Task) -> Result<(), BuildError> {
     Ok(())
 }
 
-pub async fn delete_task_container(task: &Task) -> Result<(), bollard::errors::Error> {
+pub async fn delete_task_container<T: Task>(task: &T) -> Result<(), bollard::errors::Error> {
     let docker = docker_connect()?;
 
     let options = RemoveContainerOptionsBuilder::new().build();
@@ -128,7 +124,7 @@ pub async fn delete_task_container(task: &Task) -> Result<(), bollard::errors::E
         .await
 }
 
-pub async fn restart_task(task: &Task) -> Result<(), bollard::errors::Error> {
+pub async fn restart_task<T: Task>(task: &T) -> Result<(), bollard::errors::Error> {
     match delete_task_container(task).await {
         Ok(_) => {}
         Err(bollard::errors::Error::DockerResponseServerError { status_code, .. })
@@ -155,7 +151,7 @@ pub enum RunTaskError {
     DockerError(#[from] DockerRunTaskError),
 }
 
-pub async fn start_container(task: &Task) -> Result<(), bollard::errors::Error> {
+pub async fn start_container<T: Task>(task: &T) -> Result<(), bollard::errors::Error> {
     let docker = docker_connect()?;
     let start_opts = StartContainerOptionsBuilder::new().build();
     docker
@@ -178,8 +174,8 @@ pub async fn resize_container(
         .await
 }
 
-pub async fn attach_container(
-    task: &Task,
+pub async fn attach_container<T: Task>(
+    task: &T,
 ) -> Result<AttachContainerResults, bollard::errors::Error> {
     let docker = docker_connect()?;
     let attach_opts = AttachContainerOptionsBuilder::new()

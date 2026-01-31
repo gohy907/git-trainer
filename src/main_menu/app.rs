@@ -69,7 +69,11 @@ impl App {
             },
             _ => {}
         }
-        let len = self.config.tasks.len();
+        let len = self
+            .repo
+            .get_all_tasks()
+            .expect("While working with db:")
+            .len();
         let i = match self.table_state.selected() {
             Some(0) | None => len - 1,
             Some(i) => i - 1,

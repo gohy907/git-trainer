@@ -156,15 +156,10 @@ impl App {
 // }
 
 pub fn render_attempts_table(frame: &mut Frame, app: &mut App, area: Rect) {
-    let attempts = app.submitted_attempts();
+    let attempts = app.get_attempts_of_task();
     let rows: Vec<Row> = attempts
         .iter()
-        .map(|attempt| {
-            Row::new(vec![
-                attempt.timestamp.to_string(),
-                attempt.grade.to_string(),
-            ])
-        })
+        .map(|attempt| Row::new(vec![attempt.timestamp.to_string()]))
         .collect();
 
     let header = Row::new(vec!["Дата попытки", "Оценка"])
@@ -225,7 +220,7 @@ pub fn render_attempts_table(frame: &mut Frame, app: &mut App, area: Rect) {
     );
 }
 pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
-    let tests = &app.submitted_attempts()[app.attempts_table_config.attempt_under_cursor].tests;
+    let tests = app.get_tests_of_attempt();
     let passed_count = tests.iter().filter(|t| t.passed == true).count();
     let total_count = tests.len();
 
@@ -242,7 +237,7 @@ pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
 
             let text_lines = vec![Line::from(vec![
                 Span::styled(
-                    format!("{}. ", test.id),
+                    format!("{}. ", test.id.expect("While working with db:")),
                     Style::default().add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(lines[0].clone(), Style::default()),
