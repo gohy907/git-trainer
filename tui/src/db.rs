@@ -136,6 +136,16 @@ impl Repo {
         )
     }
 
+    pub fn user_exists(&self, username: &str) -> Result<bool> {
+        let count: i64 = self.connection.query_row(
+            "SELECT COUNT(*) FROM users WHERE username = ?1",
+            [username],
+            |row| row.get(0),
+        )?;
+
+        Ok(if count > 0 { true } else { false })
+    }
+
     pub fn get_tasks_count(&self) -> Result<usize> {
         let count: i64 = self
             .connection

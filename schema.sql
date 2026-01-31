@@ -41,7 +41,7 @@ INSERT INTO users (
 )
 VALUES (
     1,
-    'gohy',
+    'koitese',
     2
 );
 

@@ -116,9 +116,14 @@ impl App {
     pub fn new() -> App {
         let mut table_state = TableState::default();
         table_state.select(Some(0));
+        let repo = Repo::init_database();
+        let username = whoami::username().expect("While getting username:");
+        if !repo.user_exists(&username).expect("While working with db:") {
+            let _ = repo.create_user(&username);
+        }
         App {
             user: whoami::username().expect("Can't get username"),
-            repo: Repo::init_database(),
+            repo: repo,
             table_state: table_state,
             attempts_table_config: AttemptsTableConfig::default(),
             task_under_cursor: 0,
