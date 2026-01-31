@@ -1,7 +1,7 @@
 use crate::Frame;
 use crate::app::{App, VERSION};
-use crate::docker;
 use crate::docker::resize_container;
+use crate::docker::{self, ensure_container_running};
 use crossterm::event;
 use crossterm::event::{Event, KeyEventKind};
 use ratatui::layout::{Alignment, Constraint};
@@ -104,8 +104,7 @@ impl App {
             cols: terminal.size()?.width - 2,
         };
 
-        docker::start_container(task).await?;
-
+        ensure_container_running(task).await?;
         let container_name = task.container_name();
         docker::resize_container(container_name.clone(), size.rows as i32, size.cols as i32)
             .await?;

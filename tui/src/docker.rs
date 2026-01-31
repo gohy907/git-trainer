@@ -45,6 +45,31 @@ fn docker_connect() -> Result<Docker, bollard::errors::Error> {
     Docker::connect_with_socket_defaults()
 }
 
+pub async fn ensure_container_running<T: Task>(task: &T) -> Result<(), bollard::errors::Error> {
+    let docker = docker_connect()?;
+
+    let exists = match docker
+        .inspect_container(&task.container_name(), None::<InspectContainerOptions>)
+        .await
+    {
+        Ok(_) => true,
+        Err(bollard::errors::Error::DockerResponseServerError { status_code, .. })
+            if status_code == 404 =>
+        {
+            false
+        }
+        Err(e) => return Err(e),
+    };
+
+    if !exists {
+        create_task_container(task).await?;
+    }
+
+    start_container(task).await?;
+
+    Ok(())
+}
+
 pub async fn create_task_container<T: Task>(task: &T) -> Result<String, bollard::errors::Error> {
     let docker = docker_connect()?;
 
