@@ -1,11 +1,12 @@
 FROM debian:bookworm-slim
 
-ARG USERNAME=aboba
-ARG GIT_USERNAME=aboba
-ARG GIT_EMAIL=aboba@aboba.com
+ARG USERNAME=student
+ARG GIT_USERNAME=student
+ARG GIT_EMAIL=student@alivetech.com
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    sudo \
     git \
     neovim \
     nano \
@@ -22,6 +23,9 @@ ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8
 
 RUN useradd --create-home --shell /bin/bash "$USERNAME"
+RUN adduser "$USERNAME" sudo && \
+    echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+RUN 
 
 WORKDIR /home/$USERNAME
 
