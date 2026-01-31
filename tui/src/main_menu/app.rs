@@ -51,8 +51,15 @@ impl App {
         if self.is_popup_active() {
             return;
         }
-        let i = match self.table_state.selected() {
-            _ => 0,
+        let len = self.repo.get_tasks_count().unwrap_or(0);
+        let i = if len != 0 {
+            if self.task_under_cursor != len - 1 {
+                self.task_under_cursor + 1
+            } else {
+                0
+            }
+        } else {
+            len
         };
         self.table_state.select(Some(i));
         self.task_under_cursor = i;
@@ -62,24 +69,17 @@ impl App {
         if self.is_popup_active() {
             return;
         }
-        match &self.active_popup {
-            Some(popup) => match popup {
-                Popup::Error(_) => return,
-                _ => {}
-            },
-            _ => {}
-        }
         let len = self.repo.get_tasks_count().unwrap_or(0);
-        let i = match self.table_state.selected() {
-            Some(0) | None => {
-                if len != 0 {
-                    len - 1
-                } else {
-                    0
-                }
+        let i = if len != 0 {
+            if self.task_under_cursor != 0 {
+                self.task_under_cursor - 1
+            } else {
+                len - 1
             }
-            Some(i) => i - 1,
+        } else {
+            len
         };
+
         self.table_state.select(Some(i));
         self.task_under_cursor = i;
     }
