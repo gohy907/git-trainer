@@ -193,6 +193,12 @@ impl App {
     ) -> Result<(), RunPtyError> {
         let mut handles = Vec::new();
         loop {
+            let a = docker::exec_command(&self.task_choosed(), "cat /etc/git-trainer/status")
+                .await
+                .unwrap_or("error".to_string());
+            if a == "1\n".to_string() {
+                print!("a\n");
+            }
             if exit_rx.try_recv().is_ok() {
                 for handle in handles {
                     if let Err(e) = handle.await {
@@ -201,6 +207,8 @@ impl App {
                 }
                 return Ok(());
             }
+
+            // println!("{:?}", a);
 
             terminal.draw(|f| self.render_pty(f, parser.read().unwrap().screen()))?;
 

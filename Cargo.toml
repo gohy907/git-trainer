@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
-members = [
+members = ["cli",
     "tui",
-    # "cli"
+    "cli"
 ]
 
 [workspace.package]

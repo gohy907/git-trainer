@@ -1,3 +1,12 @@
+FROM rust:latest AS builder
+
+WORKDIR /build
+COPY Cargo.toml .
+COPY Cargo.lock .
+COPY tui ./tui/
+COPY cli ./cli/
+RUN cargo build --release -p cli
+
 FROM debian:bookworm-slim
 
 ARG USERNAME=student
@@ -25,12 +34,16 @@ ENV LANG=en_US.UTF-8 \
 RUN useradd --create-home --shell /bin/bash "$USERNAME"
 RUN adduser "$USERNAME" sudo && \
     echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-RUN 
+
+COPY --from=builder /build/target/release/cli /usr/local/bin/git-trainer
 
 WORKDIR /home/$USERNAME
 
 RUN git config --global user.name "$GIT_USERNAME" && \
     git config --global user.email "$GIT_EMAIL" && \
     git config --global --add safe.directory /home/$USERNAME
+
+RUN mkdir -p /etc/git-trainer
+RUN echo 0 > /etc/git-trainer/status
 
 USER $USERNAME

@@ -2,6 +2,7 @@ use crate::db::Task;
 use bollard::Docker;
 use bollard::body_full;
 use bollard::container::AttachContainerResults;
+use bollard::exec::{CreateExecOptions, StartExecResults};
 use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{
     AttachContainerOptionsBuilder, BuildImageOptionsBuilder, CreateContainerOptionsBuilder,
@@ -222,4 +223,34 @@ pub async fn attach_container<T: Task>(
     docker
         .attach_container(&task.container_name(), Some(attach_opts))
         .await
+}
+
+pub async fn exec_command<T: Task>(task: &T, cmd: &str) -> Result<String, bollard::errors::Error> {
+    let docker = docker_connect()?;
+    let cmd_string: Vec<&str> = cmd.split_whitespace().collect();
+    let exec = docker
+        .create_exec(
+            &task.container_name(),
+            CreateExecOptions {
+                attach_stdout: Some(true),
+                attach_stderr: Some(true),
+                cmd: Some(cmd_string),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+    if let StartExecResults::Attached { mut output, .. } = docker.start_exec(&exec.id, None).await?
+    {
+        let mut result = String::new();
+        while let Some(Ok(msg)) = output.next().await {
+            result.push_str(&msg.to_string());
+        }
+        Ok(result)
+    } else {
+        Err(bollard::errors::Error::DockerContainerWaitError {
+            error: "Failed to attach".to_string(),
+            code: 0,
+        })
+    }
 }
