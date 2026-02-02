@@ -5,6 +5,7 @@ use crate::db::Test;
 use crate::docker;
 use crate::io;
 use crate::popup::Popup;
+use crate::pty::ui::PtyExitStatus;
 use ratatui::DefaultTerminal;
 use ratatui::Frame;
 use ratatui::widgets::{ListState, ScrollbarState, TableState};
@@ -175,9 +176,17 @@ impl App {
                         .await
                     {
                         Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
-                        _ => {}
+                        Ok(PtyExitStatus::RestartTask) => {
+                            match docker::restart_task(&self.task_choosed()).await {
+                                Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
+
+                                _ => {}
+                            };
+                        }
+                        Ok(PtyExitStatus::Exit) => {
+                            self.status = AppStatus::Idling;
+                        }
                     }
-                    self.status = AppStatus::Idling;
                 }
                 _ => {}
             }

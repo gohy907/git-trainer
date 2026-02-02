@@ -4,6 +4,7 @@ use crate::docker::resize_container;
 use crate::docker::{self, ensure_task_container_running};
 use crossterm::event;
 use crossterm::event::{Event, KeyEventKind};
+use libc::exit;
 use ratatui::layout::{Alignment, Constraint};
 use ratatui::prelude::{Direction, Layout};
 use ratatui::style::{Modifier, Style, Stylize};
@@ -62,6 +63,11 @@ pub enum RunPtyError {
     JoinError(#[from] tokio::task::JoinError),
 }
 
+pub enum PtyExitStatus {
+    Exit,
+    RestartTask,
+}
+
 impl App {
     pub fn render_pty(&mut self, frame: &mut Frame, screen: &Screen) {
         let title = Line::from(format!("git-trainer v{}", VERSION).bold()).centered();
@@ -97,7 +103,7 @@ impl App {
         &mut self,
         terminal: &mut DefaultTerminal,
         task: &T,
-    ) -> Result<(), PreparePtyError> {
+    ) -> Result<PtyExitStatus, PreparePtyError> {
         let mut handles = Vec::new();
         let size = Size {
             rows: terminal.size()?.height - 4,
@@ -175,29 +181,39 @@ impl App {
         });
         handles.push(handle);
 
-        Self::run_pty_bollard(self, terminal, parser, tx, exit_rx, container_name).await?;
+        let exit_status = self
+            .run_pty_bollard(terminal, parser, tx, exit_rx, container_name)
+            .await?;
 
         for handle in handles {
             handle.await.map_err(PreparePtyError::JoinError)?;
         }
-        Ok(())
+        Ok(exit_status)
     }
 
-    pub async fn run_pty_bollard(
+    async fn run_pty_bollard(
         &mut self,
         terminal: &mut DefaultTerminal,
         parser: Arc<RwLock<vt100::Parser>>,
         sender: Sender<Bytes>,
         exit_rx: std::sync::mpsc::Receiver<()>,
         container_name: String,
-    ) -> Result<(), RunPtyError> {
+    ) -> Result<PtyExitStatus, RunPtyError> {
         let mut handles = Vec::new();
         loop {
             let a = docker::exec_command(&self.task_choosed(), "cat /etc/git-trainer/status")
                 .await
                 .unwrap_or("error".to_string());
-            if a == "1\n".to_string() {
-                print!("a\n");
+            if a == "1".to_string() {
+                let exit_command = Bytes::from("exit\n");
+                sender.send(exit_command)?;
+
+                for handle in handles {
+                    if let Err(e) = handle.await {
+                        return Err(RunPtyError::JoinError(e));
+                    }
+                }
+                return Ok(PtyExitStatus::RestartTask);
             }
             if exit_rx.try_recv().is_ok() {
                 for handle in handles {
@@ -205,7 +221,7 @@ impl App {
                         return Err(RunPtyError::JoinError(e));
                     }
                 }
-                return Ok(());
+                return Ok(PtyExitStatus::Exit);
             }
 
             // println!("{:?}", a);
