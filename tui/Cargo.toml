@@ -25,3 +25,4 @@ futures = "0.3.31"
 chrono = {version = "0.4.43", features = ["serde"]}
 rusqlite = "0.38.0"
 whoami = "2.1.0"
+tar = "0.4.44"

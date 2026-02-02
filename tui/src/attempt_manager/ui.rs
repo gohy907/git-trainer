@@ -1,5 +1,5 @@
 use crate::app::{App, VERSION};
-use crate::test::{Test, TestStatus};
+use crate::db::{Test, TestResult};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
@@ -221,7 +221,10 @@ pub fn render_attempts_table(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let tests = app.get_tests_of_attempt();
-    let passed_count = tests.iter().filter(|t| t.passed == true).count();
+    let passed_count = tests
+        .iter()
+        .filter(|t| t.result() == TestResult::Passed)
+        .count();
     let total_count = tests.len();
 
     let title = if passed_count == total_count {
@@ -233,28 +236,24 @@ pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = tests
         .iter()
         .map(|test| {
-            let lines = wrap_text(&test.description, area.width.saturating_sub(6) as usize);
+            let style = match test.result() {
+                TestResult::Passed => Style::default().fg(Color::LightGreen),
+                TestResult::Failed => Style::default().fg(Color::Red),
+                TestResult::NotExecuted => Style::default().fg(Color::DarkGray),
+            };
+            let width = area.width * 2 - 6;
+            let lines = wrap_text(&test.description(), width.into());
 
-            let text_lines = vec![Line::from(vec![
-                Span::styled(
-                    format!("{}. ", test.id.expect("While working with db:")),
-                    Style::default().add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(lines[0].clone(), Style::default()),
-            ])];
+            let mut text_lines = Vec::new();
 
-            // for line in lines.iter() {
-            //     text_lines.push(Line::from(vec![Span::styled(
-            //         line.clone(),
-            //         Style::default(),
-            //     )]));
-            // }
+            for line in lines.iter() {
+                text_lines.push(Line::from(vec![Span::styled(line.clone(), style)]));
+            }
 
             ListItem::new(Text::from(text_lines))
         })
         .collect();
 
-    // Создаём список
     let list = List::new(items)
         .block(
             Block::default()
@@ -269,7 +268,6 @@ pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
         )
         .highlight_symbol(">> ");
 
-    // Scrollbar
     let scrollbar = Scrollbar::default()
         .orientation(ScrollbarOrientation::VerticalRight)
         .begin_symbol(Some("▲"))
@@ -290,7 +288,6 @@ pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
         height: area.height.saturating_sub(2),
     };
 
-    // Обновляем состояние scrollbar
     app.tests_scrollbar_state = app
         .tests_scrollbar_state
         .content_length(tests.len())

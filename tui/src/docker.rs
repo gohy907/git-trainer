@@ -7,8 +7,10 @@ use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{
     AttachContainerOptionsBuilder, BuildImageOptionsBuilder, CreateContainerOptionsBuilder,
     InspectContainerOptions, RemoveContainerOptionsBuilder, ResizeContainerTTYOptionsBuilder,
-    StartContainerOptionsBuilder,
+    StartContainerOptionsBuilder, UploadToContainerOptionsBuilder,
 };
+use bytes::Bytes;
+use tar::Builder;
 
 use futures_util::StreamExt;
 use std::env;
@@ -225,9 +227,18 @@ pub async fn attach_container<T: Task>(
         .await
 }
 
-pub async fn exec_command<T: Task>(task: &T, cmd: &str) -> Result<String, bollard::errors::Error> {
+pub struct CmdOutput {
+    pub output: String,
+    pub exit_code: i64,
+}
+
+pub async fn exec_command<T: Task>(
+    task: &T,
+    cmd: &str,
+) -> Result<CmdOutput, bollard::errors::Error> {
     let docker = docker_connect()?;
     let cmd_string: Vec<&str> = cmd.split_whitespace().collect();
+
     let exec = docker
         .create_exec(
             &task.container_name(),
@@ -240,17 +251,54 @@ pub async fn exec_command<T: Task>(task: &T, cmd: &str) -> Result<String, bollar
         )
         .await?;
 
+    let mut result = String::new();
     if let StartExecResults::Attached { mut output, .. } = docker.start_exec(&exec.id, None).await?
     {
-        let mut result = String::new();
         while let Some(Ok(msg)) = output.next().await {
             result.push_str(&msg.to_string());
         }
-        Ok(result)
     } else {
-        Err(bollard::errors::Error::DockerContainerWaitError {
+        return Err(bollard::errors::Error::DockerContainerWaitError {
             error: "Failed to attach".to_string(),
             code: 0,
-        })
+        });
     }
+
+    let inspect = docker.inspect_exec(&exec.id).await?;
+    let exit_code = inspect.exit_code.unwrap_or(-1);
+
+    Ok(CmdOutput {
+        output: result,
+        exit_code: exit_code,
+    })
+}
+
+pub async fn copy_directory(
+    container_name: &str,
+    source_dir: &str,
+    target_path: &str,
+) -> Result<(), bollard::errors::Error> {
+    let docker = docker_connect()?;
+    let mut tar_data = Vec::new();
+    {
+        let mut builder = Builder::new(&mut tar_data);
+
+        // Рекурсивно добавляем все файлы
+        builder.append_dir_all(".", source_dir)?;
+        builder.finish()?;
+    }
+
+    let options = UploadToContainerOptionsBuilder::new()
+        .path(target_path)
+        .build();
+
+    docker
+        .upload_to_container(
+            container_name,
+            Some(options),
+            body_full(Bytes::from(tar_data)),
+        )
+        .await?;
+
+    Ok(())
 }

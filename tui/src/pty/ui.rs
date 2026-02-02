@@ -1,10 +1,9 @@
 use crate::Frame;
 use crate::app::{App, VERSION};
-use crate::docker::resize_container;
 use crate::docker::{self, ensure_task_container_running};
+use crate::docker::{CmdOutput, resize_container};
 use crossterm::event;
 use crossterm::event::{Event, KeyEventKind};
-use libc::exit;
 use ratatui::layout::{Alignment, Constraint};
 use ratatui::prelude::{Direction, Layout};
 use ratatui::style::{Modifier, Style, Stylize};
@@ -19,7 +18,6 @@ use ratatui::DefaultTerminal;
 use std::{
     io,
     sync::{Arc, RwLock, mpsc::Sender},
-    time::Duration,
 };
 
 use bollard::container::LogOutput;
@@ -203,20 +201,29 @@ impl App {
         loop {
             let a = docker::exec_command(&self.task_choosed(), "cat /etc/git-trainer/status")
                 .await
-                .unwrap_or("error".to_string());
+                .unwrap_or(CmdOutput {
+                    output: "error".to_string(),
+                    exit_code: -1,
+                })
+                .output;
             if a == "1".to_string() {
                 let exit_command = Bytes::from("exit\n");
                 sender.send(exit_command)?;
 
-                for handle in handles {
+                for handle in handles.drain(..) {
                     if let Err(e) = handle.await {
                         return Err(RunPtyError::JoinError(e));
                     }
                 }
                 return Ok(PtyExitStatus::RestartTask);
+            } else if a == "2".to_string() {
+                let task = &self.task_choosed();
+                // самый костыльный костыль.
+                let _ = docker::exec_command(task, "git-trainer help").await;
+                self.test_submitted_task(task).await;
             }
             if exit_rx.try_recv().is_ok() {
-                for handle in handles {
+                for handle in handles.drain(..) {
                     if let Err(e) = handle.await {
                         return Err(RunPtyError::JoinError(e));
                     }
@@ -228,30 +235,28 @@ impl App {
 
             terminal.draw(|f| self.render_pty(f, parser.read().unwrap().screen()))?;
 
-            if event::poll(Duration::from_millis(10))? {
-                match event::read()? {
-                    Event::Key(key) => {
-                        if key.kind == KeyEventKind::Press {
-                            if let Some(_) = self.active_popup {
-                                let _ = self.handle_popup_key(key.code);
-                            } else {
-                                let _ = self.handle_terminal_key(key.code, key.modifiers, &sender);
-                            }
+            match event::read()? {
+                Event::Key(key) => {
+                    if key.kind == KeyEventKind::Press {
+                        if let Some(_) = self.active_popup {
+                            let _ = self.handle_popup_key(key.code);
+                        } else {
+                            let _ = self.handle_terminal_key(key.code, key.modifiers, &sender);
                         }
                     }
-                    Event::Resize(cols, rows) => {
-                        let rows = rows - 4;
-                        let cols = cols - 2;
-                        parser.write().unwrap().screen_mut().set_size(rows, cols);
-                        let name = container_name.clone();
-
-                        let handle = tokio::spawn(async move {
-                            let _ = resize_container(name, rows as i32, cols as i32).await;
-                        });
-                        handles.push(handle);
-                    }
-                    _ => {}
                 }
+                Event::Resize(cols, rows) => {
+                    let rows = rows - 4;
+                    let cols = cols - 2;
+                    parser.write().unwrap().screen_mut().set_size(rows, cols);
+                    let name = container_name.clone();
+
+                    let handle = tokio::spawn(async move {
+                        let _ = resize_container(name, rows as i32, cols as i32).await;
+                    });
+                    handles.push(handle);
+                }
+                _ => {}
             }
         }
     }

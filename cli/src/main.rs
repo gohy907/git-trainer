@@ -35,6 +35,7 @@ fn main() {
             println!("Попытка отправлена! Вы можете посмотреть оценку в менеджере попыток");
         }
         Commands::Help => {
+            fs::write("/etc/git-trainer/status", "0").unwrap();
             println!("help")
         }
     }

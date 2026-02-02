@@ -1,3 +1,4 @@
+use crate::AppStatus;
 use crate::app::App;
 use crossterm::event::{self, Event, KeyCode};
 use std::io;
@@ -44,6 +45,7 @@ impl App {
     pub fn attempt_manager_handle_events(&mut self) -> io::Result<()> {
         if let Event::Key(key) = event::read()? {
             match key.code {
+                KeyCode::Char('q') => self.status = AppStatus::Idling,
                 KeyCode::Down | KeyCode::Char('j') => {
                     self.next_attempt();
                 }

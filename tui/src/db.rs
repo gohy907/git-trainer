@@ -74,21 +74,53 @@ impl TaskModel {
 }
 
 #[derive(Debug, Clone)]
-pub struct Attempt {
+pub struct Attempt<T: Test> {
     pub id: Option<i64>,
     pub user_id: i64,
     pub task_id: i64,
     pub passed: bool,
     pub timestamp: String,
-    pub tests: Vec<Test>,
+    pub tests: Vec<T>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Test {
+pub struct TestModel {
     pub id: Option<i64>,
     pub attempt_id: i64,
     pub description: String,
-    pub passed: bool,
+    pub result: i64,
+}
+
+#[derive(PartialEq)]
+pub enum TestResult {
+    Passed,
+    Failed,
+    NotExecuted,
+}
+pub trait Test {
+    fn id(&self) -> i64;
+    fn attempt_id(&self) -> i64;
+    fn description(&self) -> String;
+    fn result(&self) -> TestResult;
+}
+
+impl Test for TestModel {
+    fn id(&self) -> i64 {
+        self.id.expect("While working with db:")
+    }
+    fn attempt_id(&self) -> i64 {
+        self.attempt_id
+    }
+    fn description(&self) -> String {
+        self.description.clone()
+    }
+    fn result(&self) -> TestResult {
+        match self.result {
+            0 => TestResult::Passed,
+            1 => TestResult::Failed,
+            _ => TestResult::NotExecuted,
+        }
+    }
 }
 
 pub struct Repo {
@@ -188,6 +220,14 @@ impl Repo {
         users.collect()
     }
 
+    pub fn get_user_id_by_username(&self, username: &str) -> Result<i64> {
+        let conn = &self.connection;
+        conn.query_row(
+            "SELECT id FROM users WHERE username = ?1",
+            [username],
+            |row| row.get(0),
+        )
+    }
     pub fn get_all_tasks<T: Task>(&self) -> Result<Vec<T>>
     where
         Vec<T>: FromIterator<TaskModel>,
@@ -232,13 +272,14 @@ impl Repo {
         &mut self,
         user_id: i64,
         task_id: i64,
-        test_results: Vec<(String, bool)>, // (description, passed)
+        test_results: Vec<(String, TestResult)>, // (description, passed)
     ) -> Result<i64> {
         let conn = &mut self.connection;
         let tx = conn.transaction()?;
 
-        // Проверяем, все ли тесты пройдены
-        let all_passed = test_results.iter().all(|(_, passed)| *passed);
+        let all_passed = test_results
+            .iter()
+            .all(|(_, passed)| *passed == TestResult::Passed);
         let now = Utc::now().to_rfc3339();
 
         // Создаём попытку
@@ -250,12 +291,16 @@ impl Repo {
 
         let attempt_id = tx.last_insert_rowid();
 
-        // Добавляем тесты
         for (description, passed) in test_results {
+            let code = match passed {
+                TestResult::Passed => 0,
+                TestResult::Failed => 1,
+                TestResult::NotExecuted => 2,
+            };
             tx.execute(
                 "INSERT INTO attempt_tests (attempt_id, description, passed)
              VALUES (?1, ?2, ?3)",
-                params![attempt_id, description, if passed { 1 } else { 0 }],
+                params![attempt_id, description, code],
             )?;
         }
 
@@ -264,7 +309,7 @@ impl Repo {
     }
 
     // ============ READ ============
-    pub fn get_attempt_by_id(&self, attempt_id: i64) -> Result<Attempt> {
+    pub fn get_attempt_by_id(&self, attempt_id: i64) -> Result<Attempt<TestModel>> {
         let conn = &self.connection;
         let attempt = conn.query_row(
             "SELECT id, user_id, task_id, passed, timestamp 
@@ -287,7 +332,7 @@ impl Repo {
         Ok(Attempt { tests, ..attempt })
     }
 
-    pub fn get_user_attempts(&self, user_id: i64) -> Result<Vec<Attempt>> {
+    pub fn get_user_attempts<T: Test>(&self, user_id: i64) -> Result<Vec<Attempt<TestModel>>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
             "SELECT id, user_id, task_id, passed, timestamp 
@@ -323,7 +368,7 @@ impl Repo {
         Ok(attempts)
     }
 
-    pub fn get_task_attempts(&self, task_id: i64) -> Result<Vec<Attempt>> {
+    pub fn get_task_attempts(&self, task_id: i64) -> Result<Vec<Attempt<TestModel>>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
             "SELECT id, user_id, task_id, passed, timestamp 
@@ -359,7 +404,11 @@ impl Repo {
         Ok(attempts)
     }
 
-    pub fn get_user_task_attempts(&self, user_id: i64, task_id: i64) -> Result<Vec<Attempt>> {
+    pub fn get_user_task_attempts(
+        &self,
+        user_id: i64,
+        task_id: i64,
+    ) -> Result<Vec<Attempt<TestModel>>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
             "SELECT id, user_id, task_id, passed, timestamp 
@@ -443,7 +492,10 @@ impl Repo {
     }
 
     // ============ READ ============
-    pub fn get_attempt_tests(&self, attempt_id: i64) -> Result<Vec<Test>> {
+    pub fn get_attempt_tests<T: Test>(&self, attempt_id: i64) -> Result<Vec<T>>
+    where
+        Vec<T>: FromIterator<TestModel>,
+    {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
             "SELECT id, attempt_id, description, passed 
@@ -452,29 +504,29 @@ impl Repo {
         )?;
 
         let tests = stmt.query_map([attempt_id], |row| {
-            Ok(Test {
+            Ok(TestModel {
                 id: Some(row.get(0)?),
                 attempt_id: row.get(1)?,
                 description: row.get(2)?,
-                passed: row.get::<_, i32>(3)? != 0,
+                result: row.get(3)?,
             })
         })?;
 
         tests.collect()
     }
 
-    pub fn get_test_by_id(&self, test_id: i64) -> Result<Test> {
+    pub fn get_test_by_id<T: Test>(&self, test_id: i64) -> Result<impl Test> {
         let conn = &self.connection;
         conn.query_row(
             "SELECT id, attempt_id, description, passed 
          FROM attempt_tests WHERE id = ?1",
             [test_id],
             |row| {
-                Ok(Test {
+                Ok(TestModel {
                     id: Some(row.get(0)?),
                     attempt_id: row.get(1)?,
                     description: row.get(2)?,
-                    passed: row.get::<_, i32>(3)? != 0,
+                    result: row.get(3)?,
                 })
             },
         )
@@ -539,7 +591,7 @@ impl Repo {
     }
 
     // Получить последнюю попытку
-    pub fn get_last_attempt(&self, user_id: i64, task_id: i64) -> Result<Attempt> {
+    pub fn get_last_attempt(&self, user_id: i64, task_id: i64) -> Result<Attempt<TestModel>> {
         let conn = &self.connection;
         let attempt_id: i64 = conn.query_row(
             "SELECT id FROM attempts 

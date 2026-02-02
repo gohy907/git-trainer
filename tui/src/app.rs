@@ -2,6 +2,8 @@ use crate::db::Attempt;
 use crate::db::Repo;
 use crate::db::Task;
 use crate::db::Test;
+use crate::db::TestModel;
+use crate::db::TestResult;
 use crate::docker;
 use crate::io;
 use crate::popup::Popup;
@@ -9,10 +11,10 @@ use crate::pty::ui::PtyExitStatus;
 use ratatui::DefaultTerminal;
 use ratatui::Frame;
 use ratatui::widgets::{ListState, ScrollbarState, TableState};
-use serde::{Deserialize, Serialize};
+use std::fs;
 use thiserror::Error;
 
-pub const VERSION: &str = "0.0.3";
+pub const VERSION: &str = "0.1.0";
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -52,13 +54,6 @@ pub enum LoadingConfigError {
 
     #[error("IO error: {0}")]
     IOError(#[from] io::Error),
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TestResult {
-    pub id: usize,
-    pub description: String,
-    pub passed: bool,
 }
 
 #[derive(PartialEq)]
@@ -198,14 +193,14 @@ impl App {
         self.repo.get_all_tasks().expect("While working with db:")[self.task_under_cursor].clone()
     }
 
-    pub fn get_attempts_of_task(&self) -> Vec<Attempt> {
+    pub fn get_attempts_of_task(&self) -> Vec<Attempt<TestModel>> {
         let task = self.task_choosed();
         self.repo
             .get_task_attempts(task.id())
             .expect("While working with db:")
     }
 
-    pub fn get_tests_of_attempt(&self) -> Vec<Test> {
+    pub fn get_tests_of_attempt(&self) -> Vec<TestModel> {
         let attempt = self.get_attempts_of_task();
         if attempt.is_empty() {
             return Vec::new();
@@ -217,5 +212,39 @@ impl App {
                     .expect("While working with db:"),
             )
             .expect("While working with db:")
+    }
+
+    pub async fn test_submitted_task<T: Task>(&mut self, task: &T) {
+        let path = format!("tests/{}", task.work_name());
+        let count = fs::read_dir(&path)
+            .expect("No test directory for task")
+            .count();
+
+        docker::copy_directory(&task.container_name(), &path, "/etc/git-trainer/tests")
+            .await
+            .unwrap();
+
+        let mut test_results = Vec::new();
+        let mut failed = false;
+        for i in 1..count + 1 {
+            if !failed {
+                let cmd = format!("/etc/git-trainer/tests/test{}.sh", i);
+                let res = docker::exec_command(task, &cmd).await.unwrap();
+                if res.exit_code == 0 {
+                    test_results.push((res.output, TestResult::Passed));
+                } else {
+                    test_results.push((res.output, TestResult::Failed));
+                    failed = true;
+                }
+            } else {
+                let res = format!("{}. Не выполнялся.", i);
+                test_results.push((res, TestResult::NotExecuted));
+            }
+        }
+
+        let user_id = self.repo.get_user_id_by_username(&self.user).unwrap();
+        self.repo
+            .create_attempt(user_id, task.id(), test_results)
+            .expect("While working with db:");
     }
 }
