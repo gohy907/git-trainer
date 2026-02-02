@@ -128,7 +128,7 @@ impl App {
             .split(frame.area());
 
         let how_to_use_string =
-            "← ↑ ↓ → — перемещение, q — выход, Enter — начать задание, r — перезагрузить задание"
+            "← ↑ ↓ → — перемещение, q — выход, Enter — начать задание, r — перезагрузить задание, Пробел — открыть менеджер попыток"
                 .to_string();
         let how_to_use = Paragraph::new(how_to_use_string).centered();
 
@@ -146,7 +146,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
     let max_task_name_length = get_max_task_name_length(app) as u16;
     let colors = TableColors::new();
 
-    let header = ["Название", "Описание", "Статус", "Оценка"]
+    let header = ["Название", "Описание", "Статус"]
         .into_iter()
         .map(Cell::from)
         .collect::<Row>()
@@ -210,10 +210,9 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
     let t = Table::new(
         rows,
         [
-            Constraint::Min(max_task_name_length),
+            Constraint::Length(max_task_name_length + 6),
             Constraint::Min(LINE_WIDTH),
             Constraint::Min(10),
-            Constraint::Min(14),
         ],
     )
     .header(header)
