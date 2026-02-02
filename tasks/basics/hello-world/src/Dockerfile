@@ -21,6 +21,7 @@ RUN apt-get update && \
     nano \
     locales \
     gcc \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && \
@@ -41,11 +42,12 @@ RUN chown root:root /usr/local/bin/git-trainer && \
 
 WORKDIR /home/$USERNAME
 
+RUN mkdir -p /etc/git-trainer
+RUN mkdir -p /etc/git-trainer/tests
+RUN echo -n 0 > /etc/git-trainer/status
+
+USER $USERNAME
 RUN git config --global user.name "$GIT_USERNAME" && \
     git config --global user.email "$GIT_EMAIL" && \
     git config --global --add safe.directory /home/$USERNAME
 
-RUN mkdir -p /etc/git-trainer
-RUN echo -n 0 > /etc/git-trainer/status
-
-USER $USERNAME
