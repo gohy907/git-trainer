@@ -36,6 +36,8 @@ RUN adduser "$USERNAME" sudo && \
     echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 COPY --from=builder /build/target/release/cli /usr/local/bin/git-trainer
+RUN chown root:root /usr/local/bin/git-trainer && \
+    chmod u+s /usr/local/bin/git-trainer
 
 WORKDIR /home/$USERNAME
 
@@ -44,6 +46,6 @@ RUN git config --global user.name "$GIT_USERNAME" && \
     git config --global --add safe.directory /home/$USERNAME
 
 RUN mkdir -p /etc/git-trainer
-RUN echo 0 > /etc/git-trainer/status
+RUN echo -n 0 > /etc/git-trainer/status
 
 USER $USERNAME

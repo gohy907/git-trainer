@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use std::fs;
 
 #[derive(Parser)]
 #[command(name = "git-trainer CLI")]
@@ -27,13 +28,11 @@ fn main() {
 
     match cli.command {
         Commands::Restart => {
-            println!("Restarting task...");
+            fs::write("/etc/git-trainer/status", "1").unwrap();
         }
         Commands::Submit => {
-            println!("Submitting task...");
-            // if let Some(msg) = message {
-            //     println!("Message: {}", msg);
-            // }
+            fs::write("/etc/git-trainer/status", "2").unwrap();
+            println!("Попытка отправлена! Вы можете посмотреть оценку в менеджере попыток");
         }
         Commands::Help => {
             println!("help")
