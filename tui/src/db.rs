@@ -93,43 +93,10 @@ pub struct Attempt {
     pub tests: Result<Vec<Test>>,
 }
 
-pub struct AttemptController {
+pub struct NewAttemptEntity {
     pub user_id: i64,
     pub task_id: i64,
-    pub tests: Vec<TestController>,
-}
-
-pub struct TestController {
-    pub description: String,
-    pub result: i64,
-}
-
-impl From<Test> for TestController {
-    fn from(test: Test) -> Self {
-        TestController {
-            description: test.description,
-            result: match test.result {
-                TestResult::Passed => 0,
-                TestResult::Failed => 1,
-                TestResult::NotExecuted => 2,
-            },
-        }
-    }
-}
-
-impl From<Attempt> for AttemptController {
-    fn from(attempt: Attempt) -> Self {
-        AttemptController {
-            user_id: attempt.user_id,
-            task_id: attempt.task_id,
-            tests: attempt
-                .tests
-                .expect("While working with db:")
-                .into_iter()
-                .map(TestController::from)
-                .collect(),
-        }
-    }
+    pub tests: Vec<NewTestEntity>,
 }
 
 impl From<AttemptEntity> for Attempt {
@@ -142,6 +109,26 @@ impl From<AttemptEntity> for Attempt {
             tests: Repo::get_attempt_tests(&Repo::init_database(), attempt_entity.id),
         }
     }
+}
+
+impl From<Attempt> for NewAttemptEntity {
+    fn from(attempt: Attempt) -> Self {
+        NewAttemptEntity {
+            user_id: attempt.user_id,
+            task_id: attempt.task_id,
+            tests: attempt
+                .tests
+                .expect("While working with db:")
+                .into_iter()
+                .map(NewTestEntity::from)
+                .collect(),
+        }
+    }
+}
+
+pub struct NewTestEntity {
+    description: String,
+    result: i64,
 }
 
 struct TestEntity {
@@ -169,6 +156,19 @@ impl From<TestEntity> for Test {
                 0 => TestResult::Passed,
                 2 => TestResult::NotExecuted,
                 _ => TestResult::Failed,
+            },
+        }
+    }
+}
+
+impl From<Test> for NewTestEntity {
+    fn from(test: Test) -> Self {
+        NewTestEntity {
+            description: test.description,
+            result: match test.result {
+                TestResult::Passed => 0,
+                TestResult::Failed => 1,
+                TestResult::NotExecuted => 2,
             },
         }
     }
@@ -345,7 +345,7 @@ impl Repo {
         &mut self,
         user_id: i64,
         task_id: i64,
-        attempt: AttemptController,
+        attempt: NewAttemptEntity,
     ) -> Result<i64> {
         let conn = &mut self.connection;
         let tx = conn.transaction()?;
@@ -362,7 +362,7 @@ impl Repo {
 
         for test in attempt.tests {
             tx.execute(
-                "INSERT INTO attempt_tests (attempt_id, description, passed)
+                "INSERT INTO attempt_tests (attempt_id, description, result)
              VALUES (?1, ?2, ?3)",
                 params![attempt_id, test.description, test.result],
             )?;
@@ -375,7 +375,7 @@ impl Repo {
     pub fn get_attempt_by_id(&self, attempt_id: i64) -> Result<Attempt> {
         let conn = &self.connection;
         conn.query_row(
-            "SELECT id, user_id, task_id, passed, timestamp 
+            "SELECT id, user_id, task_id, timestamp 
         FROM attempts WHERE id = ?1",
             [attempt_id],
             |row| {
@@ -393,7 +393,7 @@ impl Repo {
     pub fn get_user_attempts(&self, user_id: i64) -> Result<Vec<Attempt>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, passed, timestamp 
+            "SELECT id, user_id, task_id, timestamp 
          FROM attempts WHERE user_id = ?1 
          ORDER BY timestamp DESC",
         )?;
@@ -423,25 +423,18 @@ impl Repo {
     pub fn get_task_attempts(&self, task_id: i64) -> Result<Vec<Attempt>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, passed, timestamp
+            "SELECT id, user_id, task_id, timestamp
          FROM attempts WHERE task_id = ?1
          ORDER BY timestamp DESC",
         )?;
 
         let attempt_rows = stmt.query_map([task_id], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, i64>(1)?,
-                row.get::<_, i64>(2)?,
-                row.get::<_, i32>(3)? != 0,
-                row.get::<_, String>(4)?,
-            ))
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
         })?;
 
         let mut attempts = Vec::new();
         for attempt_row in attempt_rows {
-            let (id, user_id, task_id, passed, timestamp) = attempt_row?;
-            let tests = self.get_attempt_tests(id)?;
+            let (id, user_id, task_id, timestamp) = attempt_row?;
 
             attempts.push(
                 AttemptEntity {
@@ -478,7 +471,7 @@ impl Repo {
     pub fn get_attempt_tests(&self, attempt_id: i64) -> Result<Vec<Test>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
-            "SELECT id, attempt_id, description, passed 
+            "SELECT id, attempt_id, description, result 
          FROM attempt_tests WHERE attempt_id = ?1 
          ORDER BY id",
         )?;
@@ -499,7 +492,7 @@ impl Repo {
     pub fn get_test_by_id(&self, test_id: i64) -> Result<Test> {
         let conn = &self.connection;
         conn.query_row(
-            "SELECT id, attempt_id, description, passed 
+            "SELECT id, attempt_id, description, result
          FROM attempt_tests WHERE id = ?1",
             [test_id],
             |row| {

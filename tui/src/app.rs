@@ -1,4 +1,4 @@
-use crate::db::{Attempt, Repo, Task, Test, TestController, TestResult, User};
+use crate::db::{Attempt, NewTestEntity, Repo, Task, Test, TestResult, User};
 use crate::docker;
 use crate::io;
 use crate::popup::Popup;
@@ -261,20 +261,21 @@ impl App {
             }
         }
 
-        let attempt = Attempt {
-            id: 0,
-            task_id: 0,
-            user_id: 0,
-            tests: Ok(test_results),
-            timestamp: Ok("0".to_string()),
-        };
-
         let user_id = self
             .context
             .user
             .as_ref()
             .expect("While working with db:")
             .id;
+
+        let attempt = Attempt {
+            id: 0,
+            task_id: task.id,
+            user_id: user_id,
+            tests: Ok(test_results),
+            timestamp: Ok("0".to_string()),
+        };
+
         self.repo
             .create_attempt(user_id, task.id, attempt.into())
             .expect("While working with db:");
