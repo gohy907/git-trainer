@@ -23,11 +23,11 @@ pub enum TaskStatus {
 impl fmt::Display for TaskStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TaskStatus::NotInProgress => write!(f, "Not In Progress"),
-            TaskStatus::InProgress => write!(f, "In Progress"),
-            TaskStatus::Done => write!(f, "Done"),
-            TaskStatus::Pending => write!(f, "Pending"),
-            TaskStatus::Approved => write!(f, "Approved"),
+            TaskStatus::NotInProgress => write!(f, "НЕ НАЧАТО"),
+            TaskStatus::InProgress => write!(f, "НАЧАТО"),
+            TaskStatus::Done => write!(f, "ПРОВЕРЕНО"),
+            TaskStatus::Pending => write!(f, "В ПРОВЕРКЕ"),
+            TaskStatus::Approved => write!(f, "СДАНО"),
         }
     }
 }
