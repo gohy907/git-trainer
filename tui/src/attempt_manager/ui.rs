@@ -146,8 +146,8 @@ pub fn render_attempts_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // Создаём scrollbar
     let scrollbar = Scrollbar::default()
         .orientation(ScrollbarOrientation::VerticalRight)
-        .begin_symbol(Some("↑"))
-        .end_symbol(Some("↓"));
+        .begin_symbol(Some("▲"))
+        .end_symbol(Some("▼"));
 
     // Область для scrollbar (правый край таблицы)
     let scrollbar_area = Rect {
@@ -237,8 +237,6 @@ pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
         .orientation(ScrollbarOrientation::VerticalRight)
         .begin_symbol(Some("▲"))
         .end_symbol(Some("▼"))
-        .track_symbol(Some("┃"))
-        .thumb_symbol("█")
         .style(Style::default().fg(Color::DarkGray))
         .thumb_style(
             Style::default()
