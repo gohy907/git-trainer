@@ -69,8 +69,10 @@ pub struct AttemptsTableConfig {
 
 impl AttemptsTableConfig {
     pub fn default() -> Self {
+        let mut attempts_table_state = TableState::default();
+        attempts_table_state.select(Some(0));
         AttemptsTableConfig {
-            attempts_table_state: TableState::default(),
+            attempts_table_state: attempts_table_state,
             attempts_scrollbar_state: ScrollbarState::default(),
             attempt_under_cursor: 0,
         }
