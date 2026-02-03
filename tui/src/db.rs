@@ -1,94 +1,136 @@
 use crate::task::TaskStatus;
-use chrono::Utc;
+use chrono::{DateTime, Local, Utc};
 use rusqlite::{Connection, Result, params};
 use std::fs;
 
-#[derive(Debug, Clone)]
-pub struct User {
-    pub id: Option<i64>,
-    pub username: String,
-    pub created_at: String,
+struct TaskEntity {
+    id: i64,
+    name: String,
+    work_name: String,
+    description: String,
+    extended_description: String,
+    status: i64,
 }
 
-#[derive(Debug, Clone)]
-pub struct TaskModel {
-    pub id: Option<i64>,
+pub struct Task {
+    pub id: i64,
     pub name: String,
     pub work_name: String,
+    pub image_name: String,
+    pub container_name: String,
     pub description: String,
     pub extended_description: String,
-    pub status: u8,
+    pub status: TaskStatus,
+    pub attempts: Result<Vec<Attempt>>,
 }
 
-pub trait Task {
-    fn id(&self) -> i64;
-    fn name(&self) -> String;
-    fn description(&self) -> String;
-    fn extended_description(&self) -> String;
-    fn status(&self) -> TaskStatus;
-    fn container_name(&self) -> String;
-    fn image_name(&self) -> String;
-    fn work_name(&self) -> String;
-}
-
-impl Task for TaskModel {
-    fn id(&self) -> i64 {
-        self.id.expect("While working with db: ")
-    }
-    fn name(&self) -> String {
-        self.name.clone()
-    }
-    fn description(&self) -> String {
-        self.description.clone()
-    }
-    fn extended_description(&self) -> String {
-        self.extended_description.clone()
-    }
-    fn status(&self) -> TaskStatus {
-        match self.status {
-            0 => TaskStatus::NotInProgress,
-            1 => TaskStatus::InProgress,
-            _ => TaskStatus::Done,
-        }
-    }
-    fn container_name(&self) -> String {
+impl From<TaskEntity> for Task {
+    fn from(task_entity: TaskEntity) -> Self {
         let username = whoami::username()
             .expect("While getting username:")
             .to_string()
             .replace(" ", "-");
-        format!("git-trainer_{}_{}", self.work_name, username)
-    }
-    fn image_name(&self) -> String {
-        format!("git-trainer:{}", self.work_name)
-    }
-    fn work_name(&self) -> String {
-        self.work_name.clone()
+        Task {
+            id: task_entity.id,
+            name: task_entity.name,
+            work_name: task_entity.work_name,
+            container_name: format!("git-trainer_{}_{}", task_entity.work_name, username),
+            image_name: format!("git-trainer_{}", task_entity.work_name),
+            description: task_entity.description,
+            extended_description: task_entity.extended_description,
+            status: match task_entity.status {
+                0 => TaskStatus::NotInProgress,
+                1 => TaskStatus::InProgress,
+                2 => TaskStatus::Done,
+                3 => TaskStatus::Approved,
+            },
+            attempts: Repo::get_task_attempts(&Repo::init_database(), task_entity.id),
+        }
     }
 }
 
-impl TaskModel {
-    pub fn container_name(&self) -> String {
-        let user = whoami::username().expect("Can't find username");
-        format!("git-trainer_{}_{}", self.work_name, user)
-    }
+struct AttemptEntity {
+    id: i64,
+    user_id: i64,
+    task_id: i64,
+    timestamp: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct Attempt<T: Test> {
-    pub id: Option<i64>,
+fn format_timestamp(timestamp_str: &str) -> Result<String> {
+    let dt = DateTime::parse_from_rfc3339(timestamp_str)?;
+
+    let local_dt: DateTime<Local> = dt.with_timezone(&Local);
+
+    Ok(local_dt.format("%d.%m.%Y %H:%M:%S").to_string())
+}
+
+pub struct Attempt {
+    pub id: i64,
     pub user_id: i64,
     pub task_id: i64,
-    pub passed: bool,
-    pub timestamp: String,
-    pub tests: Vec<T>,
+    pub timestamp: Result<String>,
+    pub tests: Result<Vec<Test>>,
 }
 
-#[derive(Debug, Clone)]
-pub struct TestModel {
-    pub id: Option<i64>,
+impl From<AttemptEntity> for Attempt {
+    fn from(attempt_entity: AttemptEntity) -> Self {
+        Attempt {
+            id: attempt_entity.id,
+            user_id: attempt_entity.user_id,
+            task_id: attempt_entity.task_id,
+            timestamp: format_timestamp(&attempt_entity.timestamp),
+            tests: Repo::get_attempt_tests(&Repo::init_database(), attempt_entity.id),
+        }
+    }
+}
+
+struct TestEntity {
+    id: i64,
+    attempt_id: i64,
+    description: String,
+    result: i64,
+}
+
+pub struct Test {
+    pub id: i64,
     pub attempt_id: i64,
     pub description: String,
-    pub result: i64,
+    pub result: TestResult,
+}
+
+impl From<TestEntity> for Test {
+    fn from(test_entity: TestEntity) -> Self {
+        Test {
+            id: test_entity.id,
+            attempt_id: test_entity.attempt_id,
+            description: test_entity.description,
+            result: match test_entity.result {
+                0 => TestResult::Passed,
+                2 => TestResult::NotExecuted,
+                _ => TestResult::Failed,
+            },
+        }
+    }
+}
+
+struct UserEntity {
+    id: i64,
+    username: String,
+    created_at: String,
+}
+
+pub struct User {
+    pub id: i64,
+    pub username: String,
+}
+
+impl From<UserEntity> for User {
+    fn from(user_entity: UserEntity) -> Self {
+        User {
+            id: user_entity.id,
+            username: user_entity.username,
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -96,31 +138,6 @@ pub enum TestResult {
     Passed,
     Failed,
     NotExecuted,
-}
-pub trait Test {
-    fn id(&self) -> i64;
-    fn attempt_id(&self) -> i64;
-    fn description(&self) -> String;
-    fn result(&self) -> TestResult;
-}
-
-impl Test for TestModel {
-    fn id(&self) -> i64 {
-        self.id.expect("While working with db:")
-    }
-    fn attempt_id(&self) -> i64 {
-        self.attempt_id
-    }
-    fn description(&self) -> String {
-        self.description.clone()
-    }
-    fn result(&self) -> TestResult {
-        match self.result {
-            0 => TestResult::Passed,
-            1 => TestResult::Failed,
-            _ => TestResult::NotExecuted,
-        }
-    }
 }
 
 pub struct Repo {
@@ -130,14 +147,12 @@ pub struct Repo {
 impl Repo {
     pub fn init_database() -> Self {
         let db_path = "db.sqlite";
-        let schema_path = "schema.sql"; // ← ИСПРАВЛЕНО
+        let schema_path = "schema.sql";
 
         let conn = Connection::open(db_path).expect("Failed to connect to db.sqlite");
 
-        // Читаем SQL-скрипт из schema.sql
         let schema_sql = fs::read_to_string(schema_path).expect("Failed to read schema.sql");
 
-        // Выполняем SQL в БД
         conn.execute_batch(&schema_sql)
             .expect("Failed to execute schema.sql");
 
@@ -155,18 +170,18 @@ impl Repo {
         Ok(conn.last_insert_rowid())
     }
 
-    // ============ READ ============
     pub fn get_user_by_id(&self, user_id: i64) -> Result<User> {
         let conn = &self.connection;
         conn.query_row(
             "SELECT id, username, created_at FROM users WHERE id = ?1",
             [user_id],
             |row| {
-                Ok(User {
-                    id: Some(row.get(0)?),
+                Ok(UserEntity {
+                    id: row.get(0)?,
                     username: row.get(1)?,
                     created_at: row.get(2)?,
-                })
+                }
+                .into())
             },
         )
     }
@@ -195,11 +210,12 @@ impl Repo {
             "SELECT id, username, created_at FROM users WHERE username = ?1",
             [username],
             |row| {
-                Ok(User {
-                    id: Some(row.get(0)?),
+                Ok(UserEntity {
+                    id: row.get(0)?,
                     username: row.get(1)?,
                     created_at: row.get(2)?,
-                })
+                }
+                .into())
             },
         )
     }
@@ -210,17 +226,18 @@ impl Repo {
             conn.prepare("SELECT id, username, created_at FROM users ORDER BY created_at DESC")?;
 
         let users = stmt.query_map([], |row| {
-            Ok(User {
-                id: Some(row.get(0)?),
+            Ok(UserEntity {
+                id: row.get(0)?,
                 username: row.get(1)?,
                 created_at: row.get(2)?,
-            })
+            }
+            .into())
         })?;
 
         users.collect()
     }
 
-    pub fn get_user_id_by_username(&self, username: &str) -> Result<i64> {
+    pub fn get_user_id_by_username(&self, username: String) -> Result<i64> {
         let conn = &self.connection;
         conn.query_row(
             "SELECT id FROM users WHERE username = ?1",
@@ -228,17 +245,14 @@ impl Repo {
             |row| row.get(0),
         )
     }
-    pub fn get_all_tasks<T: Task>(&self) -> Result<Vec<T>>
-    where
-        Vec<T>: FromIterator<TaskModel>,
-    {
+    pub fn get_all_tasks(&self) -> Result<Vec<Task>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
             "SELECT id, name, work_name, description, extended_description, status FROM tasks",
         )?;
         let tasks = stmt.query_map([], |row| {
-            Ok(TaskModel {
-                id: Some(row.get(0)?),
+            Ok(TaskEntity {
+                id: row.get(0)?,
                 name: row.get(1)?,
                 work_name: row.get(2)?,
                 description: row.get(3)?,
@@ -250,8 +264,7 @@ impl Repo {
         tasks.collect()
     }
 
-    // ============ UPDATE ============
-    pub fn update_user(&self, user_id: i64, new_username: &str) -> Result<()> {
+    pub fn update_user(&self, user_id: i64, new_username: String) -> Result<()> {
         let conn = &self.connection;
         conn.execute(
             "UPDATE users SET username = ?1 WHERE id = ?2",
@@ -260,39 +273,33 @@ impl Repo {
         Ok(())
     }
 
-    // ============ DELETE ============
     pub fn delete_user(&self, user_id: i64) -> Result<()> {
         let conn = &self.connection;
         conn.execute("DELETE FROM users WHERE id = ?1", [user_id])?;
         Ok(())
     }
 
-    // ============ CREATE ============
     pub fn create_attempt(
         &mut self,
         user_id: i64,
         task_id: i64,
-        test_results: Vec<(String, TestResult)>, // (description, passed)
+        test_results: Vec<Test>,
     ) -> Result<i64> {
         let conn = &mut self.connection;
         let tx = conn.transaction()?;
 
-        let all_passed = test_results
-            .iter()
-            .all(|(_, passed)| *passed == TestResult::Passed);
         let now = Utc::now().to_rfc3339();
 
-        // Создаём попытку
         tx.execute(
-            "INSERT INTO attempts (user_id, task_id, passed, timestamp)
-         VALUES (?1, ?2, ?3, ?4)",
-            params![user_id, task_id, if all_passed { 1 } else { 0 }, now],
+            "INSERT INTO attempts (user_id, task_id, timestamp)
+         VALUES (?1, ?2, ?3)",
+            params![user_id, task_id, now],
         )?;
 
         let attempt_id = tx.last_insert_rowid();
 
-        for (description, passed) in test_results {
-            let code = match passed {
+        for test in test_results {
+            let code = match test.result {
                 TestResult::Passed => 0,
                 TestResult::Failed => 1,
                 TestResult::NotExecuted => 2,
@@ -300,7 +307,7 @@ impl Repo {
             tx.execute(
                 "INSERT INTO attempt_tests (attempt_id, description, passed)
              VALUES (?1, ?2, ?3)",
-                params![attempt_id, description, code],
+                params![attempt_id, test.description, code],
             )?;
         }
 
@@ -308,31 +315,25 @@ impl Repo {
         Ok(attempt_id)
     }
 
-    // ============ READ ============
-    pub fn get_attempt_by_id(&self, attempt_id: i64) -> Result<Attempt<TestModel>> {
+    pub fn get_attempt_by_id(&self, attempt_id: i64) -> Result<Attempt> {
         let conn = &self.connection;
-        let attempt = conn.query_row(
+        conn.query_row(
             "SELECT id, user_id, task_id, passed, timestamp 
-         FROM attempts WHERE id = ?1",
+        FROM attempts WHERE id = ?1",
             [attempt_id],
             |row| {
-                Ok(Attempt {
-                    id: Some(row.get(0)?),
+                Ok(AttemptEntity {
+                    id: row.get(0)?,
                     user_id: row.get(1)?,
                     task_id: row.get(2)?,
-                    passed: row.get::<_, i32>(3)? != 0,
-                    timestamp: row.get(4)?,
-                    tests: vec![],
-                })
+                    timestamp: row.get(3)?,
+                }
+                .into())
             },
-        )?;
-
-        let tests = self.get_attempt_tests(attempt_id)?;
-
-        Ok(Attempt { tests, ..attempt })
+        )
     }
 
-    pub fn get_user_attempts<T: Test>(&self, user_id: i64) -> Result<Vec<Attempt<TestModel>>> {
+    pub fn get_user_attempts(&self, user_id: i64) -> Result<Vec<Attempt>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
             "SELECT id, user_id, task_id, passed, timestamp 
@@ -341,38 +342,32 @@ impl Repo {
         )?;
 
         let attempt_rows = stmt.query_map([user_id], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, i64>(1)?,
-                row.get::<_, i64>(2)?,
-                row.get::<_, i32>(3)? != 0,
-                row.get::<_, String>(4)?,
-            ))
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
         })?;
 
         let mut attempts = Vec::new();
         for attempt_row in attempt_rows {
-            let (id, user_id, task_id, passed, timestamp) = attempt_row?;
-            let tests = self.get_attempt_tests(id)?;
+            let (id, user_id, task_id, timestamp) = attempt_row?;
 
-            attempts.push(Attempt {
-                id: Some(id),
-                user_id,
-                task_id,
-                passed,
-                timestamp,
-                tests,
-            });
+            attempts.push(
+                AttemptEntity {
+                    id: id,
+                    user_id,
+                    task_id,
+                    timestamp,
+                }
+                .into(),
+            );
         }
 
         Ok(attempts)
     }
 
-    pub fn get_task_attempts(&self, task_id: i64) -> Result<Vec<Attempt<TestModel>>> {
+    pub fn get_task_attempts(&self, task_id: i64) -> Result<Vec<Attempt>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, passed, timestamp 
-         FROM attempts WHERE task_id = ?1 
+            "SELECT id, user_id, task_id, passed, timestamp
+         FROM attempts WHERE task_id = ?1
          ORDER BY timestamp DESC",
         )?;
 
@@ -391,70 +386,20 @@ impl Repo {
             let (id, user_id, task_id, passed, timestamp) = attempt_row?;
             let tests = self.get_attempt_tests(id)?;
 
-            attempts.push(Attempt {
-                id: Some(id),
-                user_id,
-                task_id,
-                passed,
-                timestamp,
-                tests,
-            });
+            attempts.push(
+                AttemptEntity {
+                    id: id,
+                    user_id: user_id,
+                    task_id: task_id,
+                    timestamp: timestamp,
+                }
+                .into(),
+            );
         }
 
         Ok(attempts)
     }
 
-    pub fn get_user_task_attempts(
-        &self,
-        user_id: i64,
-        task_id: i64,
-    ) -> Result<Vec<Attempt<TestModel>>> {
-        let conn = &self.connection;
-        let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, passed, timestamp 
-         FROM attempts WHERE user_id = ?1 AND task_id = ?2 
-         ORDER BY timestamp DESC",
-        )?;
-
-        let attempt_rows = stmt.query_map(params![user_id, task_id], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, i64>(1)?,
-                row.get::<_, i64>(2)?,
-                row.get::<_, i32>(3)? != 0,
-                row.get::<_, String>(4)?,
-            ))
-        })?;
-
-        let mut attempts = Vec::new();
-        for attempt_row in attempt_rows {
-            let (id, user_id, task_id, passed, timestamp) = attempt_row?;
-            let tests = self.get_attempt_tests(id)?;
-
-            attempts.push(Attempt {
-                id: Some(id),
-                user_id,
-                task_id,
-                passed,
-                timestamp,
-                tests,
-            });
-        }
-
-        Ok(attempts)
-    }
-
-    // ============ UPDATE ============
-    pub fn update_attempt_status(&self, attempt_id: i64, passed: bool) -> Result<()> {
-        let conn = &self.connection;
-        conn.execute(
-            "UPDATE attempts SET passed = ?1 WHERE id = ?2",
-            params![if passed { 1 } else { 0 }, attempt_id],
-        )?;
-        Ok(())
-    }
-
-    // ============ DELETE ============
     pub fn delete_attempt(&self, attempt_id: i64) -> Result<()> {
         let conn = &self.connection;
         conn.execute("DELETE FROM attempts WHERE id = ?1", [attempt_id])?;
@@ -473,29 +418,7 @@ impl Repo {
         Ok(())
     }
 
-    // ============ CREATE ============
-    pub fn create_attempt_test(
-        &self,
-
-        attempt_id: i64,
-        description: &str,
-        passed: bool,
-    ) -> Result<i64> {
-        let conn = &self.connection;
-        conn.execute(
-            "INSERT INTO attempt_tests (attempt_id, description, passed)
-         VALUES (?1, ?2, ?3)",
-            params![attempt_id, description, if passed { 1 } else { 0 }],
-        )?;
-
-        Ok(conn.last_insert_rowid())
-    }
-
-    // ============ READ ============
-    pub fn get_attempt_tests<T: Test>(&self, attempt_id: i64) -> Result<Vec<T>>
-    where
-        Vec<T>: FromIterator<TestModel>,
-    {
+    pub fn get_attempt_tests(&self, attempt_id: i64) -> Result<Vec<Test>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
             "SELECT id, attempt_id, description, passed 
@@ -504,94 +427,37 @@ impl Repo {
         )?;
 
         let tests = stmt.query_map([attempt_id], |row| {
-            Ok(TestModel {
-                id: Some(row.get(0)?),
+            Ok(TestEntity {
+                id: row.get(0)?,
                 attempt_id: row.get(1)?,
                 description: row.get(2)?,
                 result: row.get(3)?,
-            })
+            }
+            .into())
         })?;
 
         tests.collect()
     }
 
-    pub fn get_test_by_id<T: Test>(&self, test_id: i64) -> Result<impl Test> {
+    pub fn get_test_by_id(&self, test_id: i64) -> Result<Test> {
         let conn = &self.connection;
         conn.query_row(
             "SELECT id, attempt_id, description, passed 
          FROM attempt_tests WHERE id = ?1",
             [test_id],
             |row| {
-                Ok(TestModel {
-                    id: Some(row.get(0)?),
+                Ok(TestEntity {
+                    id: row.get(0)?,
                     attempt_id: row.get(1)?,
                     description: row.get(2)?,
                     result: row.get(3)?,
-                })
+                }
+                .into())
             },
         )
     }
 
-    // ============ UPDATE ============
-    pub fn update_attempt_test(&self, test_id: i64, description: &str, passed: bool) -> Result<()> {
-        let conn = &self.connection;
-        conn.execute(
-            "UPDATE attempt_tests SET description = ?1, passed = ?2 WHERE id = ?3",
-            params![description, if passed { 1 } else { 0 }, test_id],
-        )?;
-        Ok(())
-    }
-
-    // ============ DELETE ============
-    pub fn delete_attempt_test(&self, test_id: i64) -> Result<()> {
-        let conn = &self.connection;
-        conn.execute("DELETE FROM attempt_tests WHERE id = ?1", [test_id])?;
-        Ok(())
-    }
-
-    pub fn delete_all_attempt_tests(&self, attempt_id: i64) -> Result<()> {
-        let conn = &self.connection;
-        conn.execute(
-            "DELETE FROM attempt_tests WHERE attempt_id = ?1",
-            [attempt_id],
-        )?;
-        Ok(())
-    }
-
-    // Проверить, есть ли зачтённая попытка
-    pub fn has_passed_attempt(&self, user_id: i64, task_id: i64) -> Result<bool> {
-        let conn = &self.connection;
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM attempts 
-         WHERE user_id = ?1 AND task_id = ?2 AND passed = 1",
-            params![user_id, task_id],
-            |row| row.get(0),
-        )?;
-        Ok(count > 0)
-    }
-
-    // Получить статистику по задаче
-    pub fn get_task_stats(&self, user_id: i64, task_id: i64) -> Result<(usize, usize)> {
-        let conn = &self.connection;
-        let total: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM attempts 
-         WHERE user_id = ?1 AND task_id = ?2",
-            params![user_id, task_id],
-            |row| row.get(0),
-        )?;
-
-        let passed: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM attempts 
-         WHERE user_id = ?1 AND task_id = ?2 AND passed = 1",
-            params![user_id, task_id],
-            |row| row.get(0),
-        )?;
-
-        Ok((total as usize, passed as usize))
-    }
-
-    // Получить последнюю попытку
-    pub fn get_last_attempt(&self, user_id: i64, task_id: i64) -> Result<Attempt<TestModel>> {
+    pub fn get_last_attempt(&self, user_id: i64, task_id: i64) -> Result<Attempt> {
         let conn = &self.connection;
         let attempt_id: i64 = conn.query_row(
             "SELECT id FROM attempts 
@@ -602,24 +468,5 @@ impl Repo {
         )?;
 
         self.get_attempt_by_id(attempt_id)
-    }
-
-    // Подсчёт тестов в попытке
-    pub fn count_passed_tests(&self, attempt_id: i64) -> Result<(usize, usize)> {
-        let conn = &self.connection;
-        let total: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM attempt_tests WHERE attempt_id = ?1",
-            [attempt_id],
-            |row| row.get(0),
-        )?;
-
-        let passed: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM attempt_tests 
-         WHERE attempt_id = ?1 AND passed = 1",
-            [attempt_id],
-            |row| row.get(0),
-        )?;
-
-        Ok((total as usize, passed as usize))
     }
 }
