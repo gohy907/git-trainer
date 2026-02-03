@@ -5,10 +5,8 @@ mod docker;
 mod main_menu;
 mod popup;
 mod pty;
-mod task;
 mod test;
 use crate::app::{App, AppStatus};
-use crate::task::TaskStatus;
 use ratatui::Frame;
 use std::io;
 

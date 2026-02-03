@@ -1,5 +1,5 @@
-use crate::task::TaskStatus;
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Local, ParseError, Utc};
+use core::fmt;
 use rusqlite::{Connection, Result, params};
 use std::fs;
 
@@ -10,6 +10,26 @@ struct TaskEntity {
     description: String,
     extended_description: String,
     status: i64,
+}
+
+pub enum TaskStatus {
+    NotInProgress,
+    InProgress,
+    Done,
+    Pending,
+    Approved,
+}
+
+impl fmt::Display for TaskStatus {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TaskStatus::NotInProgress => write!(f, "Not In Progress"),
+            TaskStatus::InProgress => write!(f, "In Progress"),
+            TaskStatus::Done => write!(f, "Done"),
+            TaskStatus::Pending => write!(f, "Pending"),
+            TaskStatus::Approved => write!(f, "Approved"),
+        }
+    }
 }
 
 pub struct Task {
@@ -33,7 +53,7 @@ impl From<TaskEntity> for Task {
         Task {
             id: task_entity.id,
             name: task_entity.name,
-            work_name: task_entity.work_name,
+            work_name: task_entity.work_name.clone(),
             container_name: format!("git-trainer_{}_{}", task_entity.work_name, username),
             image_name: format!("git-trainer_{}", task_entity.work_name),
             description: task_entity.description,
@@ -43,6 +63,7 @@ impl From<TaskEntity> for Task {
                 1 => TaskStatus::InProgress,
                 2 => TaskStatus::Done,
                 3 => TaskStatus::Approved,
+                _ => TaskStatus::Pending,
             },
             attempts: Repo::get_task_attempts(&Repo::init_database(), task_entity.id),
         }
@@ -56,7 +77,7 @@ struct AttemptEntity {
     timestamp: String,
 }
 
-fn format_timestamp(timestamp_str: &str) -> Result<String> {
+pub fn format_timestamp(timestamp_str: &str) -> Result<String, ParseError> {
     let dt = DateTime::parse_from_rfc3339(timestamp_str)?;
 
     let local_dt: DateTime<Local> = dt.with_timezone(&Local);
@@ -68,8 +89,47 @@ pub struct Attempt {
     pub id: i64,
     pub user_id: i64,
     pub task_id: i64,
-    pub timestamp: Result<String>,
+    pub timestamp: Result<String, ParseError>,
     pub tests: Result<Vec<Test>>,
+}
+
+pub struct AttemptController {
+    pub user_id: i64,
+    pub task_id: i64,
+    pub tests: Vec<TestController>,
+}
+
+pub struct TestController {
+    pub description: String,
+    pub result: i64,
+}
+
+impl From<Test> for TestController {
+    fn from(test: Test) -> Self {
+        TestController {
+            description: test.description,
+            result: match test.result {
+                TestResult::Passed => 0,
+                TestResult::Failed => 1,
+                TestResult::NotExecuted => 2,
+            },
+        }
+    }
+}
+
+impl From<Attempt> for AttemptController {
+    fn from(attempt: Attempt) -> Self {
+        AttemptController {
+            user_id: attempt.user_id,
+            task_id: attempt.task_id,
+            tests: attempt
+                .tests
+                .expect("While working with db:")
+                .into_iter()
+                .map(TestController::from)
+                .collect(),
+        }
+    }
 }
 
 impl From<AttemptEntity> for Attempt {
@@ -91,6 +151,7 @@ struct TestEntity {
     result: i64,
 }
 
+#[derive(Clone)]
 pub struct Test {
     pub id: i64,
     pub attempt_id: i64,
@@ -133,7 +194,7 @@ impl From<UserEntity> for User {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum TestResult {
     Passed,
     Failed,
@@ -204,7 +265,7 @@ impl Repo {
         Ok(count as usize)
     }
 
-    pub fn get_user_by_username(&self, username: &str) -> Result<User> {
+    pub fn get_user_by_username(&self, username: String) -> Result<User> {
         let conn = &self.connection;
         conn.query_row(
             "SELECT id, username, created_at FROM users WHERE username = ?1",
@@ -258,7 +319,8 @@ impl Repo {
                 description: row.get(3)?,
                 extended_description: row.get(4)?,
                 status: row.get(5)?,
-            })
+            }
+            .into())
         })?;
 
         tasks.collect()
@@ -283,7 +345,7 @@ impl Repo {
         &mut self,
         user_id: i64,
         task_id: i64,
-        test_results: Vec<Test>,
+        attempt: AttemptController,
     ) -> Result<i64> {
         let conn = &mut self.connection;
         let tx = conn.transaction()?;
@@ -298,16 +360,11 @@ impl Repo {
 
         let attempt_id = tx.last_insert_rowid();
 
-        for test in test_results {
-            let code = match test.result {
-                TestResult::Passed => 0,
-                TestResult::Failed => 1,
-                TestResult::NotExecuted => 2,
-            };
+        for test in attempt.tests {
             tx.execute(
                 "INSERT INTO attempt_tests (attempt_id, description, passed)
              VALUES (?1, ?2, ?3)",
-                params![attempt_id, test.description, code],
+                params![attempt_id, test.description, test.result],
             )?;
         }
 

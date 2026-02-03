@@ -97,11 +97,11 @@ impl App {
         }
     }
 
-    pub async fn prepare_pty_bollard<T: Task>(
+    pub async fn prepare_pty_bollard(
         &mut self,
         terminal: &mut DefaultTerminal,
-        task: &T,
     ) -> Result<PtyExitStatus, PreparePtyError> {
+        let task = self.task_under_cursor();
         let mut handles = Vec::new();
         let size = Size {
             rows: terminal.size()?.height - 4,
@@ -109,7 +109,7 @@ impl App {
         };
 
         ensure_task_container_running(task).await?;
-        let container_name = task.container_name();
+        let container_name = task.container_name.clone();
         docker::resize_container(container_name.clone(), size.rows as i32, size.cols as i32)
             .await?;
         let res = docker::attach_container(task).await?;
@@ -120,7 +120,7 @@ impl App {
         {
             let rows = size.rows as i32;
             let cols = size.cols as i32;
-            let container_name = task.container_name();
+            let container_name = task.container_name.clone();
             let handle = tokio::spawn(async move {
                 let _ = resize_container(container_name, rows, cols).await;
             });
@@ -199,7 +199,8 @@ impl App {
     ) -> Result<PtyExitStatus, RunPtyError> {
         let mut handles = Vec::new();
         loop {
-            let a = docker::exec_command(&self.task_choosed(), "cat /etc/git-trainer/status")
+            let task = self.task_under_cursor();
+            let a = docker::exec_command(&task, "cat /etc/git-trainer/status")
                 .await
                 .unwrap_or(CmdOutput {
                     output: "error".to_string(),
@@ -217,10 +218,11 @@ impl App {
                 }
                 return Ok(PtyExitStatus::RestartTask);
             } else if a == "2".to_string() {
-                let task = &self.task_choosed();
-                // самый костыльный костыль.
+                let task = self.task_under_cursor();
+                // самый костыльный костыль. Миша, если ты это читаешь, пойми и прости меня.
                 let _ = docker::exec_command(task, "git-trainer help").await;
-                self.test_submitted_task(task).await;
+
+                self.test_submitted_task().await;
             }
             if exit_rx.try_recv().is_ok() {
                 for handle in handles.drain(..) {
@@ -230,8 +232,6 @@ impl App {
                 }
                 return Ok(PtyExitStatus::Exit);
             }
-
-            // println!("{:?}", a);
 
             terminal.draw(|f| self.render_pty(f, parser.read().unwrap().screen()))?;
 

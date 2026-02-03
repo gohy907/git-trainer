@@ -84,7 +84,7 @@ impl Popup {
 
                 let mut lines = Vec::new();
 
-                for line in app.task_choosed().extended_description().lines() {
+                for line in app.task_under_cursor().extended_description.lines() {
                     lines.push(Line::from(line.to_string()).fg(Color::LightBlue));
                 }
                 lines.push(Line::from(""));

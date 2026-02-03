@@ -1,9 +1,4 @@
-use crate::db::Attempt;
-use crate::db::Repo;
-use crate::db::Task;
-use crate::db::Test;
-use crate::db::TestModel;
-use crate::db::TestResult;
+use crate::db::{Attempt, Repo, Task, Test, TestController, TestResult, User};
 use crate::docker;
 use crate::io;
 use crate::popup::Popup;
@@ -11,6 +6,7 @@ use crate::pty::ui::PtyExitStatus;
 use ratatui::DefaultTerminal;
 use ratatui::Frame;
 use ratatui::widgets::{ListState, ScrollbarState, TableState};
+use rusqlite::Error as SqlError;
 use std::fs;
 use thiserror::Error;
 
@@ -81,10 +77,15 @@ impl AttemptsTableConfig {
     }
 }
 
+pub struct Context {
+    pub user: Result<User, SqlError>,
+    pub tasks: Result<Vec<Task>, SqlError>,
+}
+
 // TODO: Rewrite tasks in struct
 pub struct App {
-    pub user: String,
     pub repo: Repo,
+    pub context: Context,
     pub table_state: TableState,
     pub task_under_cursor: usize,
     pub status: AppStatus,
@@ -121,7 +122,10 @@ impl App {
             let _ = repo.create_user(&username);
         }
         App {
-            user: username,
+            context: Context {
+                user: repo.get_user_by_username(username),
+                tasks: repo.get_all_tasks(),
+            },
             repo: repo,
             table_state: table_state,
             attempts_table_config: AttemptsTableConfig::default(),
@@ -158,69 +162,69 @@ impl App {
             self.handle_events()?;
             match self.status {
                 AppStatus::RestartingTask => {
-                    match docker::restart_task(&self.task_choosed()).await {
+                    match docker::restart_task(&self.task_under_cursor()).await {
                         Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
 
                         _ => {}
                     };
                     self.status = AppStatus::Idling;
                 }
-                AppStatus::RunningTask => {
-                    match self
-                        .prepare_pty_bollard(terminal, &self.task_choosed())
-                        .await
-                    {
-                        Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
-                        Ok(PtyExitStatus::RestartTask) => {
-                            match docker::restart_task(&self.task_choosed()).await {
-                                Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
+                AppStatus::RunningTask => match self.prepare_pty_bollard(terminal).await {
+                    Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
+                    Ok(PtyExitStatus::RestartTask) => {
+                        match docker::restart_task(&self.task_under_cursor()).await {
+                            Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
 
-                                _ => {}
-                            };
-                        }
-                        Ok(PtyExitStatus::Exit) => {
-                            self.status = AppStatus::Idling;
-                        }
+                            _ => {}
+                        };
                     }
-                }
+                    Ok(PtyExitStatus::Exit) => {
+                        self.status = AppStatus::Idling;
+                    }
+                },
                 _ => {}
             }
         }
         Ok(())
     }
 
-    pub fn task_choosed(&self) -> impl Task + use<> {
-        self.repo.get_all_tasks().expect("While working with db:")[self.task_under_cursor].clone()
+    pub fn task_under_cursor(&self) -> &Task {
+        &self.context.tasks.as_ref().expect("While working wirh db:")[self.task_under_cursor]
     }
 
-    pub fn get_attempts_of_task(&self) -> Vec<Attempt<TestModel>> {
-        let task = self.task_choosed();
-        self.repo
-            .get_task_attempts(task.id())
-            .expect("While working with db:")
+    pub fn attempts_of_choosed_task(&self) -> &Vec<Attempt> {
+        let task = self.task_under_cursor();
+        task.attempts.as_ref().expect("While working wih db:")
     }
 
-    pub fn get_tests_of_attempt(&self) -> Vec<TestModel> {
-        let attempt = self.get_attempts_of_task();
-        if attempt.is_empty() {
-            return Vec::new();
+    pub fn attempt_under_cursor(&self) -> Option<&Attempt> {
+        let attempts = &self.attempts_of_choosed_task();
+        if attempts.len() == 0 {
+            return None;
         }
-        self.repo
-            .get_attempt_tests(
-                attempt[self.attempts_table_config.attempt_under_cursor]
-                    .id
-                    .expect("While working with db:"),
-            )
-            .expect("While working with db:")
+        Some(&attempts[self.attempts_table_config.attempt_under_cursor])
     }
 
-    pub async fn test_submitted_task<T: Task>(&mut self, task: &T) {
-        let path = format!("tests/{}", task.work_name());
+    pub fn tests_of_choosed_attempt(&self) -> Vec<Test> {
+        let attempt = self.attempt_under_cursor();
+        match attempt {
+            Some(attempt) => attempt
+                .tests
+                .as_ref()
+                .expect("While working with db:")
+                .to_vec(),
+            None => Vec::new(),
+        }
+    }
+
+    pub async fn test_submitted_task(&mut self) {
+        let task = self.task_under_cursor();
+        let path = format!("tests/{}", task.work_name);
         let count = fs::read_dir(&path)
             .expect("No test directory for task")
             .count();
 
-        docker::copy_directory(&task.container_name(), &path, "/etc/git-trainer/tests")
+        docker::copy_directory(&task.container_name, &path, "/etc/git-trainer/tests")
             .await
             .unwrap();
 
@@ -231,20 +235,48 @@ impl App {
                 let cmd = format!("/etc/git-trainer/tests/test{}.sh", i);
                 let res = docker::exec_command(task, &cmd).await.unwrap();
                 if res.exit_code == 0 {
-                    test_results.push((res.output, TestResult::Passed));
+                    test_results.push(Test {
+                        id: 0,
+                        attempt_id: 0,
+                        description: res.output,
+                        result: TestResult::Passed,
+                    });
                 } else {
-                    test_results.push((res.output, TestResult::Failed));
+                    test_results.push(Test {
+                        id: 0,
+                        attempt_id: 0,
+                        description: res.output,
+                        result: TestResult::Failed,
+                    });
                     failed = true;
                 }
             } else {
                 let res = format!("{}. Не выполнялся.", i);
-                test_results.push((res, TestResult::NotExecuted));
+                test_results.push(Test {
+                    id: 0,
+                    attempt_id: 0,
+                    description: res,
+                    result: TestResult::NotExecuted,
+                });
             }
         }
 
-        let user_id = self.repo.get_user_id_by_username(&self.user).unwrap();
+        let attempt = Attempt {
+            id: 0,
+            task_id: 0,
+            user_id: 0,
+            tests: Ok(test_results),
+            timestamp: Ok("0".to_string()),
+        };
+
+        let user_id = self
+            .context
+            .user
+            .as_ref()
+            .expect("While working with db:")
+            .id;
         self.repo
-            .create_attempt(user_id, task.id(), test_results)
+            .create_attempt(user_id, task.id, attempt.into())
             .expect("While working with db:");
     }
 }

@@ -1,46 +1,12 @@
 use crate::app::{App, VERSION};
-use crate::db::{Test, TestResult};
+use crate::db::{TaskStatus, TestResult, format_timestamp};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{
-    Block, Borders, Cell, List, ListItem, Paragraph, Row, Scrollbar, ScrollbarOrientation, Table,
+    Block, Borders, List, ListItem, Paragraph, Row, Scrollbar, ScrollbarOrientation, Table,
 };
-
-// Предварительно обработай текст: разбей на строки нужной ширины
-fn a_wrap_text(text: &str, width: usize) -> Vec<String> {
-    textwrap::wrap(text, width)
-        .into_iter()
-        .map(|s| s.to_string())
-        .collect()
-}
-
-fn render_table(frame: &mut Frame, rect: Rect) {
-    // Создай строку с многострочными ячейками
-    let long_text = "Очень длинный текст, который нужно обрезать в несколько строк";
-    let wrapped_lines = wrap_text(long_text, 50); // ширина 20 символов
-    let height = wrapped_lines.len() as u16;
-
-    // Собери текст обратно с \n
-    let cell_text = wrapped_lines.join("\n");
-
-    let row = Row::new(vec![
-        Cell::from("ID"),
-        Cell::from(cell_text),
-        Cell::from("Status"),
-    ])
-    .height(height); // ⭐ УКАЗЫВАЕМ ВЫСОТУ СТРОКИ
-    let widths = [
-        Constraint::Length(10),     // колонка 1: фиксированная ширина 10 символов
-        Constraint::Percentage(50), // колонка 2: 50% от доступного места
-        Constraint::Min(20),        // колонка 3: минимум 20, остальное — сколько есть
-    ];
-
-    let table = Table::new(vec![row], widths).block(Block::default().borders(Borders::ALL));
-
-    frame.render_widget(table, rect);
-}
 
 impl App {
     pub fn render_attempt_manager(&mut self, frame: &mut Frame) {
@@ -103,20 +69,27 @@ impl App {
         // // Grade справа
         // let grade = Paragraph::new("Grade: 85/100").alignment(Alignment::Right);
         // frame.render_widget(grade, grade_area);
-        let task_name = "Introduction to Git";
-        let grade = format!("Grade: {}/100", 85);
+        let task_name = self.task_under_cursor().name.clone();
+        let task_status = &self.task_under_cursor().status;
 
-        // Вычисляем ширину
+        let span_status_style = match task_status {
+            TaskStatus::NotInProgress => Span::from(task_status.to_string()).fg(Color::Red),
+            TaskStatus::InProgress => Span::from(task_status.to_string().fg(Color::Yellow)),
+            TaskStatus::Done => Span::from(task_status.to_string()).fg(Color::Blue),
+            TaskStatus::Approved => Span::from(task_status.to_string()).fg(Color::LightGreen),
+            _ => Span::from(task_status.to_string()).fg(Color::DarkGray),
+        };
+
         let area = global_area[1];
-        let inner_width = area.width.saturating_sub(2); // минус рамки
-        let text_length = (task_name.len() + grade.len()) as u16;
+        let inner_width = area.width.saturating_sub(2);
+        let text_length =
+            (task_name.chars().count() + task_status.to_string().chars().count()) as u16;
         let padding = inner_width.saturating_sub(text_length).max(1);
 
-        // Создаём контент
         let content = Line::from(vec![
             Span::from(task_name),
             Span::raw(" ".repeat(padding as usize)),
-            Span::from(grade),
+            span_status_style,
         ]);
 
         let block = Block::default().borders(Borders::ALL);
@@ -128,41 +101,33 @@ impl App {
     }
 }
 
-// impl App {
-//     pub fn load_tests(&mut self) {
-//         self.tests = Some(vec![
-//             Test {
-//                 id: 1,
-//                 description: "Убедитесь, что коммит в репозитории ровно один".to_string(),
-//                 status: TestStatus::Failed,
-//             },
-//             Test {
-//                 id: 2,
-//                 description: "Код компилируется".to_string(),
-//                 status: TestStatus::Passed,
-//             },
-//             Test {
-//                 id: 3,
-//                 description: "Убедитесь, что на экран выводится строка \"Hello, world!\"".to_string(),
-//                 status: TestStatus::Failed,
-//             },
-//             Test {
-//                 id: 4,
-//                 description: "Программа должна корректно обрабатывать входные данные и выдавать правильный результат на различных тестовых случаях".to_string(),
-//                 status: TestStatus::Passed,
-//             },
-//         ]);
-//     }
-// }
-
 pub fn render_attempts_table(frame: &mut Frame, app: &mut App, area: Rect) {
-    let attempts = app.get_attempts_of_task();
-    let rows: Vec<Row> = attempts
-        .iter()
-        .map(|attempt| Row::new(vec![attempt.timestamp.to_string()]))
-        .collect();
+    let attempts = app.attempts_of_choosed_task();
 
-    let header = Row::new(vec!["Дата попытки", "Оценка"])
+    let mut rows = Vec::new();
+    for attempt in attempts {
+        let tests = app
+            .repo
+            .get_attempt_tests(attempt.id)
+            .expect("While working with db:");
+        let passed_count = tests
+            .iter()
+            .filter(|t| t.result == TestResult::Passed)
+            .count();
+        let total_count = tests.len();
+        let tests_passed = format!("{}/{}", passed_count, total_count);
+        let row = Row::new(vec![
+            attempt
+                .timestamp
+                .as_ref()
+                .expect("While working with db:")
+                .clone(),
+            tests_passed,
+        ]);
+        rows.push(row);
+    }
+
+    let header = Row::new(vec!["Дата попытки", "Тесты"])
         .style(
             Style::default()
                 .fg(Color::Yellow)
@@ -176,11 +141,6 @@ pub fn render_attempts_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let table = Table::new(rows, widths)
         .header(header)
         .block(Block::default().borders(Borders::ALL))
-        .highlight_style(
-            Style::default()
-                .bg(Color::DarkGray)
-                .add_modifier(Modifier::BOLD),
-        )
         .highlight_symbol(">> ");
 
     // Создаём scrollbar
@@ -220,10 +180,10 @@ pub fn render_attempts_table(frame: &mut Frame, app: &mut App, area: Rect) {
     );
 }
 pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
-    let tests = app.get_tests_of_attempt();
+    let tests = app.tests_of_choosed_attempt();
     let passed_count = tests
         .iter()
-        .filter(|t| t.result() == TestResult::Passed)
+        .filter(|t| t.result == TestResult::Passed)
         .count();
     let total_count = tests.len();
 
@@ -236,13 +196,18 @@ pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = tests
         .iter()
         .map(|test| {
-            let style = match test.result() {
+            let style = match test.result {
                 TestResult::Passed => Style::default().fg(Color::LightGreen),
                 TestResult::Failed => Style::default().fg(Color::Red),
                 TestResult::NotExecuted => Style::default().fg(Color::DarkGray),
             };
-            let width = area.width * 2 - 6;
-            let lines = wrap_text(&test.description(), width.into());
+            let width = area.width;
+            let mut lines: Vec<String> = textwrap::wrap(&test.description, width as usize)
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect();
+            lines.pop();
+            let lines = wrap_text(&test.description, width.into());
 
             let mut text_lines = Vec::new();
 
@@ -299,38 +264,10 @@ pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
 
 // Функция для переноса длинного текста
 fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut current_line = String::new();
-
-    for word in text.split_whitespace() {
-        if current_line.len() + word.len() + 1 > max_width {
-            if !current_line.is_empty() {
-                lines.push(current_line.clone());
-                current_line.clear();
-            }
-
-            if word.len() > max_width {
-                for chunk in word.as_bytes().chunks(max_width) {
-                    lines.push(String::from_utf8_lossy(chunk).to_string());
-                }
-            } else {
-                current_line = word.to_string();
-            }
-        } else {
-            if !current_line.is_empty() {
-                current_line.push(' ');
-            }
-            current_line.push_str(word);
-        }
-    }
-
-    if !current_line.is_empty() {
-        lines.push(current_line);
-    }
-
-    if lines.is_empty() {
-        lines.push(String::new());
-    }
-
+    let mut lines: Vec<String> = textwrap::wrap(text, max_width)
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect();
+    lines.pop();
     lines
 }

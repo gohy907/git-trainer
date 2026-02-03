@@ -48,13 +48,14 @@ fn docker_connect() -> Result<Docker, bollard::errors::Error> {
     Docker::connect_with_socket_defaults()
 }
 
-pub async fn ensure_task_container_running<T: Task>(
-    task: &T,
-) -> Result<(), bollard::errors::Error> {
+pub async fn ensure_task_container_running(task: &Task) -> Result<(), bollard::errors::Error> {
     let docker = docker_connect()?;
 
     let exists = match docker
-        .inspect_container(&task.container_name(), None::<InspectContainerOptions>)
+        .inspect_container(
+            &task.container_name.clone(),
+            None::<InspectContainerOptions>,
+        )
         .await
     {
         Ok(_) => true,
@@ -75,16 +76,16 @@ pub async fn ensure_task_container_running<T: Task>(
     Ok(())
 }
 
-pub async fn create_task_container<T: Task>(task: &T) -> Result<String, bollard::errors::Error> {
+pub async fn create_task_container(task: &Task) -> Result<String, bollard::errors::Error> {
     let docker = docker_connect()?;
     let create_opts = CreateContainerOptionsBuilder::new()
-        .name(&task.container_name())
+        .name(&task.container_name)
         .build();
 
     let config = ContainerCreateBody {
-        image: Some(task.image_name()),
+        image: Some(task.image_name.clone()),
         tty: Some(true),
-        hostname: Some(task.work_name()),
+        hostname: Some(task.work_name.clone()),
         attach_stdin: Some(true),
         attach_stdout: Some(true),
         attach_stderr: Some(true),
@@ -98,14 +99,12 @@ pub async fn create_task_container<T: Task>(task: &T) -> Result<String, bollard:
     Ok(created.id)
 }
 
-pub async fn ensure_task_container_created<T: Task>(
-    task: &T,
-) -> Result<String, bollard::errors::Error> {
+pub async fn ensure_task_container_created(task: &Task) -> Result<String, bollard::errors::Error> {
     let docker = docker_connect()?;
 
     // eprintln!("{}", &task.work_name);
     match docker
-        .inspect_container(&task.container_name(), None::<InspectContainerOptions>)
+        .inspect_container(&task.container_name, None::<InspectContainerOptions>)
         .await
     {
         Ok(info) => {
@@ -121,17 +120,17 @@ pub async fn ensure_task_container_created<T: Task>(
 }
 
 // TODO: REMOVE 'BASICS' DIRECTORY FROM TASKS, IT'S REDUNDANT FOR NOW
-pub async fn build_task_image<T: Task>(task: &T) -> Result<(), BuildError> {
+pub async fn build_task_image(task: &Task) -> Result<(), BuildError> {
     let docker = docker_connect()?;
 
-    let name_of_image = task.image_name().clone();
+    let name_of_image = task.image_name.clone();
 
     let build_options = BuildImageOptionsBuilder::new()
         .dockerfile("src/Dockerfile")
         .t(&name_of_image)
         .build();
 
-    let mut file = File::open(tasks_root().join(&task.work_name()).join("src.tar.gz"))?;
+    let mut file = File::open(tasks_root().join(&task.work_name).join("src.tar.gz"))?;
     let mut contents = Vec::new();
     file.read_to_end(&mut contents)?;
 
@@ -151,16 +150,16 @@ pub async fn build_task_image<T: Task>(task: &T) -> Result<(), BuildError> {
     Ok(())
 }
 
-pub async fn delete_task_container<T: Task>(task: &T) -> Result<(), bollard::errors::Error> {
+pub async fn delete_task_container(task: &Task) -> Result<(), bollard::errors::Error> {
     let docker = docker_connect()?;
 
     let options = RemoveContainerOptionsBuilder::new().build();
     docker
-        .remove_container(&task.container_name(), Some(options))
+        .remove_container(&task.container_name, Some(options))
         .await
 }
 
-pub async fn restart_task<T: Task>(task: &T) -> Result<(), bollard::errors::Error> {
+pub async fn restart_task(task: &Task) -> Result<(), bollard::errors::Error> {
     match delete_task_container(task).await {
         Ok(_) => {}
         Err(bollard::errors::Error::DockerResponseServerError { status_code, .. })
@@ -187,11 +186,11 @@ pub enum RunTaskError {
     DockerError(#[from] DockerRunTaskError),
 }
 
-pub async fn start_container<T: Task>(task: &T) -> Result<(), bollard::errors::Error> {
+pub async fn start_container(task: &Task) -> Result<(), bollard::errors::Error> {
     let docker = docker_connect()?;
     let start_opts = StartContainerOptionsBuilder::new().build();
     docker
-        .start_container(&task.container_name(), Some(start_opts))
+        .start_container(&task.container_name, Some(start_opts))
         .await
 }
 
@@ -210,8 +209,8 @@ pub async fn resize_container(
         .await
 }
 
-pub async fn attach_container<T: Task>(
-    task: &T,
+pub async fn attach_container(
+    task: &Task,
 ) -> Result<AttachContainerResults, bollard::errors::Error> {
     let docker = docker_connect()?;
     let attach_opts = AttachContainerOptionsBuilder::new()
@@ -223,7 +222,7 @@ pub async fn attach_container<T: Task>(
         .build();
 
     docker
-        .attach_container(&task.container_name(), Some(attach_opts))
+        .attach_container(&task.container_name, Some(attach_opts))
         .await
 }
 
@@ -232,16 +231,13 @@ pub struct CmdOutput {
     pub exit_code: i64,
 }
 
-pub async fn exec_command<T: Task>(
-    task: &T,
-    cmd: &str,
-) -> Result<CmdOutput, bollard::errors::Error> {
+pub async fn exec_command(task: &Task, cmd: &str) -> Result<CmdOutput, bollard::errors::Error> {
     let docker = docker_connect()?;
     let cmd_string: Vec<&str> = cmd.split_whitespace().collect();
 
     let exec = docker
         .create_exec(
-            &task.container_name(),
+            &task.container_name,
             CreateExecOptions {
                 attach_stdout: Some(true),
                 attach_stderr: Some(true),

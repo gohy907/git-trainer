@@ -1,7 +1,6 @@
-use crate::TaskStatus;
 use crate::app::App;
 use crate::app::VERSION;
-use crate::db::Task;
+use crate::db::TaskStatus;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize, palette::tailwind};
@@ -158,7 +157,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
             _ => colors.alt_row_color,
         };
 
-        let status_str = match data.status() {
+        let status_str = match data.status {
             TaskStatus::NotInProgress => "НЕ НАЧАТО",
             TaskStatus::InProgress => "НАЧАТО",
             TaskStatus::Done => "СДЕЛАНО",
@@ -168,7 +167,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
 
         let cell_height = 4;
 
-        let wrapped_desc = wrap(&data.description(), LINE_WIDTH as usize, cell_height);
+        let wrapped_desc = wrap(&data.description, LINE_WIDTH as usize, cell_height);
         let item = [
             data.name.clone(),
             wrapped_desc,
@@ -185,7 +184,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
                 Cell::from(Text::from(content)).style(Style::new().fg(Color::White).bg(row_bg));
 
             if col == 2 {
-                let status_color = match data.status() {
+                let status_color = match data.status {
                     TaskStatus::NotInProgress => Color::Red,
                     TaskStatus::InProgress => Color::Yellow,
                     TaskStatus::Done => Color::Blue,
