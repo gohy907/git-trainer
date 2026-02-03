@@ -157,6 +157,7 @@ impl App {
 
     pub async fn run_app(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while self.status != AppStatus::Exiting {
+            self.update_context();
             // self.status = AppStatus::ShowingAttempts;
             terminal.draw(|f| self.render(f))?;
             self.handle_events()?;
@@ -279,5 +280,9 @@ impl App {
         self.repo
             .create_attempt(user_id, task.id, attempt.into())
             .expect("While working with db:");
+    }
+
+    pub fn update_context(&mut self) {
+        self.context.tasks = self.repo.get_all_tasks();
     }
 }
