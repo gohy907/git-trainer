@@ -223,6 +223,7 @@ impl App {
                 let _ = docker::exec_command(task, "git-trainer help").await;
 
                 self.test_submitted_task().await;
+                self.update_context();
             }
             if exit_rx.try_recv().is_ok() {
                 for handle in handles.drain(..) {

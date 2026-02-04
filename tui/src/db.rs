@@ -12,6 +12,32 @@ struct TaskEntity {
     status: i64,
 }
 
+pub struct NewTaskEntity {
+    name: String,
+    work_name: String,
+    description: String,
+    extended_description: String,
+    status: i64,
+}
+
+impl From<&Task> for NewTaskEntity {
+    fn from(task: &Task) -> Self {
+        NewTaskEntity {
+            name: task.name.clone(),
+            work_name: task.work_name.clone(),
+            description: task.description.clone(),
+            extended_description: task.extended_description.clone(),
+            status: match task.status {
+                TaskStatus::NotInProgress => 0,
+                TaskStatus::InProgress => 1,
+                TaskStatus::Done => 2,
+                TaskStatus::Approved => 3,
+                TaskStatus::Pending => 4,
+            },
+        }
+    }
+}
+
 pub enum TaskStatus {
     NotInProgress,
     InProgress,
@@ -518,5 +544,25 @@ impl Repo {
         )?;
 
         self.get_attempt_by_id(attempt_id)
+    }
+
+    pub fn get_task_id_by_name(&self, name: String) -> Result<i64> {
+        let conn = &self.connection;
+        conn.query_row("SELECT id FROM tasks WHERE name = ?1", [name], |row| {
+            row.get(0)
+        })
+    }
+
+    pub fn update_task_status(&self, task: NewTaskEntity) -> Result<()> {
+        let conn = &self.connection;
+        let id = self
+            .get_task_id_by_name(task.name)
+            .expect("While working with db:");
+
+        conn.execute(
+            "UPDATE tasks SET status = ?1 WHERE id = ?2",
+            params![task.status, id],
+        )?;
+        Ok(())
     }
 }

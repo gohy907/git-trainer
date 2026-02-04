@@ -157,13 +157,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
             _ => colors.alt_row_color,
         };
 
-        let status_str = match data.status {
-            TaskStatus::NotInProgress => "НЕ НАЧАТО",
-            TaskStatus::InProgress => "НАЧАТО",
-            TaskStatus::Done => "СДЕЛАНО",
-            TaskStatus::Pending => "ОТПРАВЛЕНО",
-            TaskStatus::Approved => "ОЦЕНЕНО",
-        };
+        let status_str = data.status.to_string();
 
         let cell_height = 4;
 

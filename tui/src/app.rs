@@ -1,8 +1,10 @@
-use crate::db::{Attempt, Repo, Task, Test, TestResult, User};
+use crate::db::{Attempt, Repo, Task, TaskStatus, Test, TestResult, User};
 use crate::docker;
 use crate::io;
 use crate::popup::Popup;
 use crate::pty::ui::PtyExitStatus;
+use core::panic;
+use libc::wait;
 use ratatui::DefaultTerminal;
 use ratatui::Frame;
 use ratatui::widgets::{ListState, ScrollbarState, TableState};
@@ -194,8 +196,8 @@ impl App {
 
     pub async fn run_app(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while self.status != AppStatus::Exiting {
-            self.update_context();
             // self.status = AppStatus::ShowingAttempts;
+            self.update_context();
             terminal.draw(|f| self.render(f))?;
             self.handle_events()?;
             match self.status {
@@ -207,19 +209,27 @@ impl App {
                     };
                     self.status = AppStatus::Idling;
                 }
-                AppStatus::RunningTask => match self.prepare_pty_bollard(terminal).await {
-                    Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
-                    Ok(PtyExitStatus::RestartTask) => {
-                        match docker::restart_task(&self.task_under_cursor()).await {
-                            Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
+                AppStatus::RunningTask => {
+                    let task: &mut Task = self.task_under_cursor_mut();
 
-                            _ => {}
-                        };
+                    match task.status {
+                        TaskStatus::NotInProgress => task.status = TaskStatus::InProgress,
+                        _ => {}
                     }
-                    Ok(PtyExitStatus::Exit) => {
-                        self.status = AppStatus::Idling;
+                    match self.prepare_pty_bollard(terminal).await {
+                        Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
+                        Ok(PtyExitStatus::RestartTask) => {
+                            match docker::restart_task(&self.task_under_cursor()).await {
+                                Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
+
+                                _ => {}
+                            };
+                        }
+                        Ok(PtyExitStatus::Exit) => {
+                            self.status = AppStatus::Idling;
+                        }
                     }
-                },
+                }
                 _ => {}
             }
         }
@@ -227,7 +237,11 @@ impl App {
     }
 
     pub fn task_under_cursor(&self) -> &Task {
-        &self.context.tasks.as_ref().expect("While working wirh db:")[self.task_under_cursor]
+        &self.context.tasks.as_ref().expect("while working with db:")[self.task_under_cursor]
+    }
+
+    pub fn task_under_cursor_mut(&mut self) -> &mut Task {
+        &mut self.context.tasks.as_mut().expect("while working with db:")[self.task_under_cursor]
     }
 
     pub fn attempts_of_choosed_task(&self) -> &Vec<Attempt> {
@@ -325,6 +339,33 @@ impl App {
     }
 
     pub fn update_context(&mut self) {
+        let tasks = self.context.tasks.as_mut().expect("While working with db:");
+        for task in tasks.iter_mut() {
+            let attempts = task.attempts.as_ref().expect("While working with db:");
+            if attempts.is_empty() {
+                continue;
+            }
+
+            let all_passed = attempts.iter().any(|attempt| {
+                attempt
+                    .tests
+                    .as_ref()
+                    .expect("While working with db:")
+                    .iter()
+                    .all(|test| test.result == TestResult::Passed)
+            });
+
+            task.status = if all_passed {
+                TaskStatus::Approved
+            } else {
+                TaskStatus::Done
+            };
+        }
+
+        for task in tasks.iter() {
+            let _ = self.repo.update_task_status(task.into());
+        }
+
         self.context.tasks = self.repo.get_all_tasks();
     }
 }

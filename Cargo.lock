@@ -2573,6 +2573,7 @@ dependencies = [
  "tokio",
  "toml",
  "tui-term",
+ "unicode-width",
  "vt100",
  "whoami",
 ]
