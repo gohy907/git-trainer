@@ -81,7 +81,7 @@ impl From<TaskEntity> for Task {
             name: task_entity.name,
             work_name: task_entity.work_name.clone(),
             container_name: format!("git-trainer_{}_{}", task_entity.work_name, username),
-            image_name: format!("git-trainer_{}", task_entity.work_name),
+            image_name: format!("git-trainer:{}", task_entity.work_name),
             description: task_entity.description,
             extended_description: task_entity.extended_description,
             status: match task_entity.status {
