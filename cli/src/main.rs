@@ -36,7 +36,9 @@ fn main() {
         }
         Commands::Help => {
             fs::write("/etc/git-trainer/status", "0").unwrap();
-            println!("help")
+            let bytes = fs::read("/etc/git-trainer/description").unwrap();
+            let description = String::from_utf8(bytes).unwrap();
+            println!("{}", description);
         }
     }
 }

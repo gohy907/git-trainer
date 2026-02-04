@@ -12,6 +12,7 @@ FROM debian:bookworm-slim
 ARG USERNAME=student
 ARG GIT_USERNAME=student
 ARG GIT_EMAIL=student@alivetech.com
+ENV DESCRIPTION="Давайте начнём с чего-нибудь лёгкого.\nСоздайте в папке \"hello-world\" новый Git репозиторий, в котором напишите код на C, выводящий на экран строчку \"Hello, World!\".\nПосле этого сделайте ровно один коммит, добавляющий этот код, с названием \"Initial commit\"."
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -45,6 +46,7 @@ WORKDIR /home/$USERNAME
 RUN mkdir -p /etc/git-trainer
 RUN mkdir -p /etc/git-trainer/tests
 RUN echo -n 0 > /etc/git-trainer/status
+RUN echo -n $DESCRIPTION > /etc/git-trainer/description
 
 USER $USERNAME
 RUN git config --global user.name "$GIT_USERNAME" && \
