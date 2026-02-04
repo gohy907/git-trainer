@@ -1,5 +1,5 @@
-use crate::AppStatus;
 use crate::app::App;
+use crate::{AppStatus, app::AttemptManagerStatus};
 use crossterm::event::{self, Event, KeyCode};
 use std::io;
 
@@ -7,7 +7,12 @@ impl App {
     // Прокрутка вниз
     fn next_attempt(&mut self) {
         let attempts = self.attempts_of_choosed_task();
-        let i = match self.attempts_table_config.attempts_table_state.selected() {
+        let i = match self
+            .attempt_manager_config
+            .attempts_table_config
+            .attempts_table_state
+            .selected()
+        {
             Some(i) => {
                 if i >= attempts.len() - 1 {
                     0
@@ -17,16 +22,24 @@ impl App {
             }
             None => 0,
         };
-        self.attempts_table_config
+        self.attempt_manager_config
+            .attempts_table_config
             .attempts_table_state
             .select(Some(i));
-        self.attempts_table_config.attempt_under_cursor = i;
+        self.attempt_manager_config
+            .attempts_table_config
+            .attempt_under_cursor = i;
     }
 
     // Прокрутка вверх
     fn previous_attempt(&mut self) {
         let attempts = self.attempts_of_choosed_task();
-        let i = match self.attempts_table_config.attempts_table_state.selected() {
+        let i = match self
+            .attempt_manager_config
+            .attempts_table_config
+            .attempts_table_state
+            .selected()
+        {
             Some(i) => {
                 if i == 0 {
                     attempts.len() - 1
@@ -36,22 +49,41 @@ impl App {
             }
             None => 0,
         };
-        self.attempts_table_config
+        self.attempt_manager_config
+            .attempts_table_config
             .attempts_table_state
             .select(Some(i));
-        self.attempts_table_config.attempt_under_cursor = i;
+        self.attempt_manager_config
+            .attempts_table_config
+            .attempt_under_cursor = i;
     }
 
     pub fn attempt_manager_handle_events(&mut self) -> io::Result<()> {
         if let Event::Key(key) = event::read()? {
             match key.code {
                 KeyCode::Char('q') => self.status = AppStatus::Idling,
-                KeyCode::Down | KeyCode::Char('j') => {
-                    self.next_attempt();
+                KeyCode::Down => match self.attempt_manager_config.status {
+                    AttemptManagerStatus::SelectingAttempts => self.next_attempt(),
+                    AttemptManagerStatus::SelectingTests => self.next_test(),
+                },
+                KeyCode::Up => match self.attempt_manager_config.status {
+                    AttemptManagerStatus::SelectingAttempts => self.previous_attempt(),
+                    AttemptManagerStatus::SelectingTests => self.previous_test(),
+                },
+                KeyCode::Right => {
+                    self.attempt_manager_config.status = AttemptManagerStatus::SelectingTests
                 }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    self.previous_attempt();
+                KeyCode::Left => {
+                    self.attempt_manager_config.status = AttemptManagerStatus::SelectingAttempts;
+                    self.attempt_manager_config
+                        .tests_table_config
+                        .list_state
+                        .select(Some(0));
+                    self.attempt_manager_config
+                        .tests_table_config
+                        .test_under_cursor = 0;
                 }
+
                 _ => {}
             }
         }
@@ -63,7 +95,12 @@ impl App {
             return;
         }
 
-        let i = match self.tests_list_state.selected() {
+        let i = match self
+            .attempt_manager_config
+            .tests_table_config
+            .list_state
+            .selected()
+        {
             Some(i) => {
                 if i >= tests.len() - 1 {
                     0
@@ -73,8 +110,21 @@ impl App {
             }
             None => 0,
         };
-        self.tests_list_state.select(Some(i));
-        self.tests_scrollbar_state = self.tests_scrollbar_state.position(i);
+        self.attempt_manager_config
+            .tests_table_config
+            .list_state
+            .select(Some(i));
+        self.attempt_manager_config
+            .tests_table_config
+            .scrollbar_state = self
+            .attempt_manager_config
+            .tests_table_config
+            .scrollbar_state
+            .position(i);
+
+        self.attempt_manager_config
+            .tests_table_config
+            .test_under_cursor = i;
     }
 
     fn previous_test(&mut self) {
@@ -83,7 +133,12 @@ impl App {
             return;
         }
 
-        let i = match self.tests_list_state.selected() {
+        let i = match self
+            .attempt_manager_config
+            .tests_table_config
+            .list_state
+            .selected()
+        {
             Some(i) => {
                 if i == 0 {
                     tests.len() - 1
@@ -93,8 +148,24 @@ impl App {
             }
             None => 0,
         };
-        self.tests_list_state.select(Some(i));
-        self.tests_scrollbar_state = self.tests_scrollbar_state.position(i);
+        self.attempt_manager_config
+            .tests_table_config
+            .list_state
+            .select(Some(i));
+        self.attempt_manager_config
+            .tests_table_config
+            .list_state
+            .select(Some(i));
+        self.attempt_manager_config
+            .tests_table_config
+            .scrollbar_state = self
+            .attempt_manager_config
+            .tests_table_config
+            .scrollbar_state
+            .position(i);
+        self.attempt_manager_config
+            .tests_table_config
+            .test_under_cursor = i;
     }
 
     pub fn tests_handle_events(&mut self) -> io::Result<()> {
@@ -106,16 +177,16 @@ impl App {
                 KeyCode::Up | KeyCode::Char('k') => {
                     self.previous_test();
                 }
-                KeyCode::Home | KeyCode::Char('g') => {
-                    self.tests_list_state.select(Some(0));
-                    self.tests_scrollbar_state = self.tests_scrollbar_state.position(0);
-                }
-                KeyCode::End | KeyCode::Char('G') => {
-                    let tests = self.tests_of_choosed_attempt();
-                    let last = tests.len() - 1;
-                    self.tests_list_state.select(Some(last));
-                    self.tests_scrollbar_state = self.tests_scrollbar_state.position(last);
-                }
+                // KeyCode::Home | KeyCode::Char('g') => {
+                //     self.tests_list_state.select(Some(0));
+                //     self.tests_scrollbar_state = self.tests_scrollbar_state.position(0);
+                // }
+                // KeyCode::End | KeyCode::Char('G') => {
+                //     let tests = self.tests_of_choosed_attempt();
+                //     let last = tests.len() - 1;
+                //     self.tests_list_state.select(Some(last));
+                //     self.tests_scrollbar_state = self.tests_scrollbar_state.position(last);
+                // }
                 _ => {}
             }
         }

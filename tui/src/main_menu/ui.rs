@@ -87,9 +87,9 @@ fn wrap(text: &str, width: usize, max_lines: usize) -> String {
 }
 
 pub struct TableColors {
-    normal_row_color: Color,
-    alt_row_color: Color,
-    selected_row_style_fg: Color,
+    pub normal_row_color: Color,
+    pub alt_row_color: Color,
+    pub selected_row_style_fg: Color,
 }
 
 impl TableColors {

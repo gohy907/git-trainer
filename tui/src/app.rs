@@ -1,4 +1,4 @@
-use crate::db::{Attempt, NewTestEntity, Repo, Task, Test, TestResult, User};
+use crate::db::{Attempt, Repo, Task, Test, TestResult, User};
 use crate::docker;
 use crate::io;
 use crate::popup::Popup;
@@ -79,6 +79,46 @@ impl AttemptsTableConfig {
     }
 }
 
+pub struct TestsTableConfig {
+    pub list_state: ListState,
+    pub scrollbar_state: ScrollbarState,
+    pub test_under_cursor: usize,
+}
+
+impl TestsTableConfig {
+    pub fn default() -> Self {
+        let mut list_state = ListState::default();
+        list_state.select(Some(0));
+        TestsTableConfig {
+            list_state: list_state,
+            scrollbar_state: ScrollbarState::default(),
+            test_under_cursor: 0,
+        }
+    }
+}
+
+#[derive(PartialEq)]
+pub enum AttemptManagerStatus {
+    SelectingAttempts,
+    SelectingTests,
+}
+
+pub struct AttemptManagerConfig {
+    pub status: AttemptManagerStatus,
+    pub attempts_table_config: AttemptsTableConfig,
+    pub tests_table_config: TestsTableConfig,
+}
+
+impl AttemptManagerConfig {
+    pub fn default() -> AttemptManagerConfig {
+        AttemptManagerConfig {
+            status: AttemptManagerStatus::SelectingAttempts,
+            attempts_table_config: AttemptsTableConfig::default(),
+            tests_table_config: TestsTableConfig::default(),
+        }
+    }
+}
+
 pub struct Context {
     pub user: Result<User, SqlError>,
     pub tasks: Result<Vec<Task>, SqlError>,
@@ -93,10 +133,7 @@ pub struct App {
     pub status: AppStatus,
     pub active_popup: Option<Popup>,
 
-    pub attempts_table_config: AttemptsTableConfig,
-
-    pub tests_list_state: ListState,
-    pub tests_scrollbar_state: ScrollbarState,
+    pub attempt_manager_config: AttemptManagerConfig,
 }
 
 #[cfg(debug_assertions)]
@@ -130,12 +167,10 @@ impl App {
             },
             repo: repo,
             table_state: table_state,
-            attempts_table_config: AttemptsTableConfig::default(),
             task_under_cursor: 0,
             status: AppStatus::Idling,
             active_popup: None,
-            tests_list_state: ListState::default(),
-            tests_scrollbar_state: ScrollbarState::default(),
+            attempt_manager_config: AttemptManagerConfig::default(),
         }
     }
 
@@ -205,7 +240,12 @@ impl App {
         if attempts.len() == 0 {
             return None;
         }
-        Some(&attempts[self.attempts_table_config.attempt_under_cursor])
+        Some(
+            &attempts[self
+                .attempt_manager_config
+                .attempts_table_config
+                .attempt_under_cursor],
+        )
     }
 
     pub fn tests_of_choosed_attempt(&self) -> Vec<Test> {
