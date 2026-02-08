@@ -195,7 +195,6 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
         Row::new(cells).height(4).style(Style::new().bg(row_bg))
     });
 
-    let bar = ">>";
     let selected_row_style = Style::default()
         .add_modifier(Modifier::REVERSED)
         .fg(colors.selected_row_style_fg);
@@ -209,13 +208,7 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
         ],
     )
     .header(header)
-    .row_highlight_style(selected_row_style)
-    .highlight_symbol(Text::from(vec![
-        "".into(),
-        bar.into(),
-        bar.into(),
-        "".into(),
-    ]));
+    .row_highlight_style(selected_row_style);
 
     frame.render_stateful_widget(t, rect, &mut app.table_state);
 }
