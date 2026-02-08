@@ -1,9 +1,8 @@
 use crate::app::{App, AttemptManagerStatus, VERSION};
 use crate::db::{TaskStatus, TestResult};
-use chrono::format::format;
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{
     Block, Borders, List, ListItem, Paragraph, Row, Scrollbar, ScrollbarOrientation, Table,
@@ -64,6 +63,12 @@ impl App {
         frame.render_widget(paragraph, area);
         render_attempts_table(frame, self, attempts_area);
         render_tests_table(frame, self, main_area[1]);
+
+        let explanation = "← ↑ ↓ → — перемещение, q — выход".to_string();
+        let explanation = Paragraph::new(explanation)
+            .style(Style::default())
+            .alignment(Alignment::Center);
+        frame.render_widget(explanation, global_area[3]);
     }
 }
 

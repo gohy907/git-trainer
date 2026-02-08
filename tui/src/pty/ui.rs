@@ -12,7 +12,6 @@ use ratatui::widgets::{Block, Borders, Paragraph};
 use tui_term::{vt100, widget::PseudoTerminal};
 use vt100::Screen;
 
-use crate::db::Task;
 use bytes::Bytes;
 use ratatui::DefaultTerminal;
 use std::{
@@ -84,7 +83,8 @@ impl App {
             .borders(Borders::ALL)
             .style(Style::default().add_modifier(Modifier::BOLD));
         let pseudo_term = PseudoTerminal::new(screen).block(block);
-        let explanation = "Напишите команду exit для выхода".to_string();
+        let explanation =
+            "Напишите команду exit для выхода и git-trainer для помощи и сдачи заданий".to_string();
         let explanation = Paragraph::new(explanation)
             .style(Style::default())
             .alignment(Alignment::Center);
