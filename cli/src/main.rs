@@ -1,10 +1,11 @@
 use clap::{Parser, Subcommand};
+use std::io;
+use std::io::Write;
 use std::fs;
 
 #[derive(Parser)]
 #[command(name = "git-trainer CLI")]
 #[command(about = "git-trainer CLI", long_about = None)]
-// #[command(disable_help_flag = )]
 #[command(disable_help_subcommand = true)]
 struct Cli {
     #[command(subcommand)]
@@ -14,31 +15,54 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Перезагрузить текущее задание
-    Restart,
+    Restart {
+ #[arg(short = 'y', long = "yes")]
+        yes: bool,
+    },
 
-    /// Показать текущее задание
-    Help,
+    /// Показать формулировку текущего задания
+    Task,
 
-    /// Отправить текущее задание
+    /// Отправить текущее задание на проверку
     Submit,
 }
 
-fn main() {
+fn confirm(question: &str) -> io::Result<bool> {
+    loop {
+        print!("{question} [Y/n]: ");
+        io::stdout().flush()?;
+
+        let mut line = String::new();
+        io::stdin().read_line(&mut line)?;
+
+        match line.trim().to_lowercase().as_str() {
+            ""| "y" | "yes" => return Ok(true),
+            _  => return Ok(false),
+        }
+    }
+}
+
+fn main() -> io::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Restart => {
-            fs::write("/etc/git-trainer/status", "1").unwrap();
+        Commands::Restart { yes } => {
+            if !yes && !confirm("Перезагрузить текущее задание? Вы потеряете весь текущий прогресс.")? {
+                return Ok(());
+            }
+            fs::write("/etc/git-trainer/status", "1")?;
         }
         Commands::Submit => {
-            fs::write("/etc/git-trainer/status", "2").unwrap();
+            fs::write("/etc/git-trainer/status", "2")?;
             println!("Попытка отправлена! Вы можете посмотреть оценку в менеджере попыток");
         }
-        Commands::Help => {
-            fs::write("/etc/git-trainer/status", "0").unwrap();
-            let bytes = fs::read("/etc/git-trainer/description").unwrap();
+        Commands::Task => {
+            fs::write("/etc/git-trainer/status", "0")?;
+            let bytes = fs::read("/etc/git-trainer/description")?;
             let description = String::from_utf8(bytes).unwrap();
-            println!("{}", description);
+            println!("{description}");
         }
     }
+
+    Ok(())
 }
