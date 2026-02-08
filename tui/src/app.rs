@@ -274,7 +274,13 @@ impl App {
 
     pub async fn test_submitted_task(&mut self) {
         let task = self.task_under_cursor();
+
+        #[cfg(debug_assertions)]
         let path = format!("tests/{}", task.work_name);
+
+        #[cfg(not(debug_assertions))]
+        let path = format!("/var/lib/git-trainer/tests/{}", task.work_name);
+
         let count = fs::read_dir(&path)
             .expect("No test directory for task")
             .count();

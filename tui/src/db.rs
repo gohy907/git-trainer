@@ -233,8 +233,17 @@ pub struct Repo {
 
 impl Repo {
     pub fn init_database() -> Self {
+        #[cfg(debug_assertions)]
         let db_path = "db.sqlite";
+
+        #[cfg(not(debug_assertions))]
+        let db_path = "/var/lib/git-trainer/db.sqlite";
+
+        #[cfg(debug_assertions)]
         let schema_path = "schema.sql";
+
+        #[cfg(not(debug_assertions))]
+        let schema_path = "/var/lib/git-trainer/schema.sql";
 
         let conn = Connection::open(db_path).expect("Failed to connect to db.sqlite");
 
