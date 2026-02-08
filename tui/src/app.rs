@@ -3,8 +3,6 @@ use crate::docker;
 use crate::io;
 use crate::popup::Popup;
 use crate::pty::ui::PtyExitStatus;
-use core::panic;
-use libc::wait;
 use ratatui::DefaultTerminal;
 use ratatui::Frame;
 use ratatui::widgets::{ListState, ScrollbarState, TableState};

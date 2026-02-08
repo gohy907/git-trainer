@@ -1,5 +1,6 @@
 use crate::app::{App, AttemptManagerStatus, VERSION};
 use crate::db::{TaskStatus, TestResult};
+use chrono::format::format;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
@@ -238,14 +239,18 @@ pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let tests = app.tests_of_choosed_attempt();
     let passed_count = tests
         .iter()
-        .filter(|t| t.result == TestResult::NotExecuted)
+        .filter(|t| t.result == TestResult::Passed)
         .count();
     let total_count = tests.len();
 
-    let title = if passed_count == total_count {
-        format!("Тесты: пройдены все ({}/{})", passed_count, total_count)
+    let title = if total_count != 0 {
+        if passed_count == total_count {
+            format!("Тесты: пройдены все ({}/{})", passed_count, total_count)
+        } else {
+            format!("Тесты: пройдены не все ({}/{})", passed_count, total_count)
+        }
     } else {
-        format!("Тесты: пройдены не все ({}/{})", passed_count, total_count)
+        format!("Попыток ещё нет.")
     };
     let items: Vec<ListItem> = tests
         .iter()
