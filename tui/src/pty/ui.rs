@@ -220,7 +220,7 @@ impl App {
             } else if a == "2".to_string() {
                 let task = self.task_under_cursor();
                 // самый костыльный костыль. Миша, если ты это читаешь, пойми и прости меня.
-                let _ = docker::exec_command(task, "git-trainer help").await;
+                let _ = docker::exec_command(task, "git-trainer task").await;
 
                 self.test_submitted_task().await;
                 self.update_context();
