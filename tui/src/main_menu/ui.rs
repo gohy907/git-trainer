@@ -150,7 +150,10 @@ fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
         .map(Cell::from)
         .collect::<Row>()
         .height(1);
-    let binding = app.repo.get_all_tasks().expect("While working with db: ");
+    let binding = app
+        .repo
+        .get_tasks_user_local(app.context.user.as_ref().unwrap().id)
+        .expect("While working with db:");
     let rows = binding.iter().enumerate().map(|(i, data)| {
         let row_bg = match i % 2 {
             0 => colors.normal_row_color,

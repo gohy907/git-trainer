@@ -3,6 +3,14 @@ use core::fmt;
 use rusqlite::{Connection, Result, params};
 use std::fs;
 
+pub struct TaskModel {
+    pub id: i64,
+    pub name: String,
+    pub work_name: String,
+    pub description: String,
+    pub extended_description: String,
+}
+
 struct TaskEntity {
     id: i64,
     name: String,
@@ -12,7 +20,20 @@ struct TaskEntity {
     status: i64,
 }
 
-pub struct NewTaskEntity {
+impl From<&TaskModel> for TaskEntity {
+    fn from(value: &TaskModel) -> Self {
+        Self {
+            id: value.id,
+            name: value.name.clone(),
+            work_name: value.work_name.clone(),
+            description: value.description.clone(),
+            extended_description: value.extended_description.clone(),
+            status: 0,
+        }
+    }
+}
+
+pub struct TaskPayload {
     name: String,
     work_name: String,
     description: String,
@@ -20,9 +41,9 @@ pub struct NewTaskEntity {
     status: i64,
 }
 
-impl From<&Task> for NewTaskEntity {
+impl From<&Task> for TaskPayload {
     fn from(task: &Task) -> Self {
-        NewTaskEntity {
+        TaskPayload {
             name: task.name.clone(),
             work_name: task.work_name.clone(),
             description: task.description.clone(),
@@ -38,6 +59,7 @@ impl From<&Task> for NewTaskEntity {
     }
 }
 
+#[derive(Clone)]
 pub enum TaskStatus {
     NotInProgress,
     InProgress,
@@ -231,6 +253,25 @@ pub struct Repo {
     connection: Connection,
 }
 
+pub struct UserTaskStatus {
+    pub id: i64,
+    pub user_id: i64,
+    pub task_id: i64,
+    pub status: i64,
+}
+
+impl From<UserTaskStatus> for TaskStatus {
+    fn from(value: UserTaskStatus) -> Self {
+        match value.status {
+            0 => TaskStatus::NotInProgress,
+            1 => TaskStatus::InProgress,
+            2 => TaskStatus::Done,
+            3 => TaskStatus::Approved,
+            _ => TaskStatus::Pending,
+        }
+    }
+}
+
 impl Repo {
     pub fn init_database() -> Self {
         #[cfg(debug_assertions)]
@@ -254,32 +295,241 @@ impl Repo {
 
         Repo { connection: conn }
     }
-    pub fn create_user(&self, username: &str) -> Result<i64> {
-        let conn = &self.connection;
-        let now = Utc::now().to_rfc3339();
 
-        conn.execute(
-            "INSERT INTO users (username, created_at) VALUES (?1, ?2)",
-            params![username, now],
+    pub fn get_task_attempts_user_local(&self, user_id: i64, task_id: i64) -> Result<Vec<Attempt>> {
+        let conn = &self.connection;
+        let mut stmt = conn.prepare(
+            "SELECT id, user_id, task_id, timestamp 
+         FROM attempts WHERE user_id = ?1 AND task_id = ?2 
+         ORDER BY timestamp DESC",
         )?;
 
-        Ok(conn.last_insert_rowid())
+        let attempt_rows = stmt.query_map([user_id, task_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?;
+
+        let mut attempts = Vec::new();
+        for attempt_row in attempt_rows {
+            let (id, user_id, task_id, timestamp) = attempt_row?;
+
+            attempts.push(
+                AttemptEntity {
+                    id: id,
+                    user_id,
+                    task_id,
+                    timestamp,
+                }
+                .into(),
+            );
+        }
+
+        Ok(attempts)
     }
 
-    pub fn get_user_by_id(&self, user_id: i64) -> Result<User> {
+    pub fn get_tasks_user_local(&self, user_id: i64) -> Result<Vec<Task>> {
+        let conn = &self.connection;
+
+        // let mut stmt = conn.prepare(
+        //     "SELECT id, attempt_id, description, result
+        //  FROM attempt_tests WHERE attempt_id = ?1
+        //  ORDER BY id",
+        // )?;
+        //
+        // let tests = stmt.query_map([attempt_id], |row| {
+        //     Ok(TestEntity {
+        //         id: row.get(0)?,
+        //         attempt_id: row.get(1)?,
+        //         description: row.get(2)?,
+        //         result: row.get(3)?,
+        //     }
+        //     .into())
+        // })?;
+
+        // println!("{}", user_id);
+
+        let mut stmt = conn.prepare(
+            "SELECT id, user_id, task_id, status 
+             FROM user_task_statuses 
+             WHERE user_id = ?1
+             ORDER BY task_id",
+        )?;
+
+        let statuses = stmt.query_map([user_id], |row| {
+            let user_task_status = UserTaskStatus {
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                task_id: row.get(2)?,
+                status: row.get(3)?,
+            };
+
+            let task_model = self.get_task_by_id(user_task_status.task_id)?;
+
+            let attempts = self.get_task_attempts_user_local(user_id, user_task_status.task_id)?;
+
+            let username = self.get_username_by_id(user_id)?;
+
+            Ok(Task {
+                id: task_model.id,
+                name: task_model.name,
+                attempts: Ok(attempts),
+                container_name: format!("git-trainer_{}_{}", task_model.work_name, username),
+                work_name: task_model.work_name.clone(),
+                image_name: format!("git-trainer:{}", task_model.work_name),
+                description: task_model.description,
+                extended_description: task_model.extended_description,
+                status: match user_task_status.status {
+                    0 => TaskStatus::NotInProgress,
+                    1 => TaskStatus::InProgress,
+                    2 => TaskStatus::Done,
+                    3 => TaskStatus::Approved,
+                    _ => TaskStatus::Pending,
+                },
+            })
+        })?;
+
+        statuses.collect()
+    }
+
+    pub fn get_username_by_id(&self, user_id: i64) -> Result<String> {
         let conn = &self.connection;
         conn.query_row(
-            "SELECT id, username, created_at FROM users WHERE id = ?1",
+            "SELECT username FROM users WHERE id = ?1",
             [user_id],
-            |row| {
-                Ok(UserEntity {
-                    id: row.get(0)?,
-                    username: row.get(1)?,
-                    created_at: row.get(2)?,
-                }
-                .into())
-            },
+            |row| Ok(row.get(0)?),
         )
+    }
+
+    pub fn get_task_by_id(&self, task_id: i64) -> Result<TaskModel> {
+        let conn = &self.connection;
+        conn.query_row(
+            "SELECT id, name, work_name, description, extended_description FROM tasks WHERE id = ?1",
+            [task_id],
+            |row| {
+                Ok(TaskModel {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    work_name: row.get(2)?,
+                    description: row.get(3)?,
+                    extended_description: row.get(4)?
+                })
+            }
+        )
+    }
+
+    pub fn get_all_tasks(&self) -> Result<Vec<TaskModel>> {
+        let conn = &self.connection;
+        let mut stmt = conn.prepare("SELECT * FROM tasks")?;
+        let task_rows = stmt.query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
+        })?;
+        let mut task_models = Vec::new();
+        for task_row in task_rows {
+            let (id, name, work_name, description, extended_description) = task_row?;
+            task_models.push(TaskModel {
+                id: id,
+                name: name,
+                work_name: work_name,
+                description: description,
+                extended_description: extended_description,
+            });
+        }
+
+        Ok(task_models)
+    }
+
+    // let mut stmt = conn.prepare(
+    //     "SELECT id, user_id, task_id, timestamp
+    //  FROM attempts WHERE user_id = ?1
+    //  ORDER BY timestamp DESC",
+    // )?;
+    // let attempt_rows = stmt.query_map([user_id], |row| {
+    //     Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+    // })?;
+    //
+    // let mut attempts = Vec::new();
+    // for attempt_row in attempt_rows {
+    //     let (id, user_id, task_id, timestamp) = attempt_row?;
+    //
+    //     attempts.push(
+    //         AttemptEntity {
+    //             id: id,
+    //             user_id,
+    //             task_id,
+    //             timestamp,
+    //         }
+    //         .into(),
+    //     );
+    // }
+
+    pub fn load_tasks(&self, user_id: i64) -> Result<()> {
+        let conn = &self.connection;
+        let task_models = self.get_all_tasks()?;
+
+        for task_model in task_models {
+            conn.execute(
+                "INSERT INTO user_task_statuses (user_id, task_id, status)
+             VALUES (?1, ?2, ?3)",
+                params![user_id, task_model.id, 0],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn create_user(&mut self, username: &str) -> Result<i64> {
+        let task_models = self.get_all_tasks()?;
+
+        let conn = &mut self.connection;
+        let tx = conn.transaction()?;
+        let now = Utc::now().to_rfc3339();
+
+        tx.execute(
+            "INSERT INTO users (username, created_at) VALUES (?1, ?2)",
+            params![username, now],
+        )
+        .unwrap();
+
+        let user_id = tx.last_insert_rowid();
+
+        for task_model in task_models {
+            tx.execute(
+                "INSERT INTO user_task_statuses (user_id, task_id, status)
+             VALUES (?1, ?2, ?3)",
+                params![user_id, task_model.id, 0],
+            )?;
+        }
+
+        tx.commit()?;
+        Ok(user_id)
+
+        // let conn = &mut self.connection;
+        // let tx = conn.transaction()?;
+        //
+        // let now = Utc::now().to_rfc3339();
+        //
+        // tx.execute(
+        //     "INSERT INTO attempts (user_id, task_id, timestamp)
+        //  VALUES (?1, ?2, ?3)",
+        //     params![user_id, task_id, now],
+        // )?;
+        //
+        // let attempt_id = tx.last_insert_rowid();
+        //
+        // for test in attempt.tests {
+        //     tx.execute(
+        //         "INSERT INTO attempt_tests (attempt_id, description, result)
+        //      VALUES (?1, ?2, ?3)",
+        //         params![attempt_id, test.description, test.result],
+        //     )?;
+        // }
+        //
+        // tx.commit()?;
+        // Ok(attempt_id)
     }
 
     pub fn user_exists(&self, username: &str) -> Result<bool> {
@@ -314,66 +564,6 @@ impl Repo {
                 .into())
             },
         )
-    }
-
-    pub fn get_all_users(&self) -> Result<Vec<User>> {
-        let conn = &self.connection;
-        let mut stmt =
-            conn.prepare("SELECT id, username, created_at FROM users ORDER BY created_at DESC")?;
-
-        let users = stmt.query_map([], |row| {
-            Ok(UserEntity {
-                id: row.get(0)?,
-                username: row.get(1)?,
-                created_at: row.get(2)?,
-            }
-            .into())
-        })?;
-
-        users.collect()
-    }
-
-    pub fn get_user_id_by_username(&self, username: String) -> Result<i64> {
-        let conn = &self.connection;
-        conn.query_row(
-            "SELECT id FROM users WHERE username = ?1",
-            [username],
-            |row| row.get(0),
-        )
-    }
-    pub fn get_all_tasks(&self) -> Result<Vec<Task>> {
-        let conn = &self.connection;
-        let mut stmt = conn.prepare(
-            "SELECT id, name, work_name, description, extended_description, status FROM tasks",
-        )?;
-        let tasks = stmt.query_map([], |row| {
-            Ok(TaskEntity {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                work_name: row.get(2)?,
-                description: row.get(3)?,
-                extended_description: row.get(4)?,
-                status: row.get(5)?,
-            }
-            .into())
-        })?;
-
-        tasks.collect()
-    }
-
-    pub fn update_user(&self, user_id: i64, new_username: String) -> Result<()> {
-        let conn = &self.connection;
-        conn.execute(
-            "UPDATE users SET username = ?1 WHERE id = ?2",
-            params![new_username, user_id],
-        )?;
-        Ok(())
-    }
-
-    pub fn delete_user(&self, user_id: i64) -> Result<()> {
-        let conn = &self.connection;
-        conn.execute("DELETE FROM users WHERE id = ?1", [user_id])?;
-        Ok(())
     }
 
     pub fn create_attempt(
@@ -497,12 +687,6 @@ impl Repo {
         Ok(())
     }
 
-    pub fn delete_task_attempts(&self, task_id: i64) -> Result<()> {
-        let conn = &self.connection;
-        conn.execute("DELETE FROM attempts WHERE task_id = ?1", [task_id])?;
-        Ok(())
-    }
-
     pub fn get_attempt_tests(&self, attempt_id: i64) -> Result<Vec<Test>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
@@ -562,15 +746,19 @@ impl Repo {
         })
     }
 
-    pub fn update_task_status(&self, task: NewTaskEntity) -> Result<()> {
+    pub fn update_task_status(&self, task_id: i64, user_id: i64, status: TaskStatus) -> Result<()> {
         let conn = &self.connection;
-        let id = self
-            .get_task_id_by_name(task.name)
-            .expect("While working with db:");
+        let status = match status {
+            TaskStatus::NotInProgress => 0,
+            TaskStatus::InProgress => 1,
+            TaskStatus::Done => 2,
+            TaskStatus::Approved => 3,
+            _ => 4,
+        };
 
         conn.execute(
-            "UPDATE tasks SET status = ?1 WHERE id = ?2",
-            params![task.status, id],
+            "UPDATE user_task_statuses SET status = ?1 WHERE task_id = ?2, user_id = ?3",
+            params![status, task_id, user_id],
         )?;
         Ok(())
     }

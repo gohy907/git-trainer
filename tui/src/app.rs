@@ -152,7 +152,7 @@ impl App {
     pub fn new() -> App {
         let mut table_state = TableState::default();
         table_state.select(Some(0));
-        let repo = Repo::init_database();
+        let mut repo = Repo::init_database();
         let username = whoami::username()
             .expect("While getting username:")
             .to_string()
@@ -160,10 +160,11 @@ impl App {
         if !repo.user_exists(&username).expect("While working with db:") {
             let _ = repo.create_user(&username);
         }
+        let user = repo.get_user_by_username(username);
         App {
             context: Context {
-                user: repo.get_user_by_username(username),
-                tasks: repo.get_all_tasks(),
+                tasks: repo.get_tasks_user_local(user.as_ref().unwrap().id),
+                user: user,
             },
             repo: repo,
             table_state: table_state,
@@ -280,6 +281,7 @@ impl App {
 
         #[cfg(not(debug_assertions))]
         let path = format!("/var/lib/git-trainer/tests/{}", task.work_name);
+        println!("{}", path);
 
         let count = fs::read_dir(&path)
             .expect("No test directory for task")
@@ -343,6 +345,8 @@ impl App {
     }
 
     pub fn update_context(&mut self) {
+        let user_id = self.context.user.as_ref().unwrap().id;
+        self.repo.load_tasks(user_id);
         let tasks = self.context.tasks.as_mut().expect("While working with db:");
         for task in tasks.iter_mut() {
             let attempts = task.attempts.as_ref().expect("While working with db:");
@@ -367,9 +371,11 @@ impl App {
         }
 
         for task in tasks.iter() {
-            let _ = self.repo.update_task_status(task.into());
+            let _ = self
+                .repo
+                .update_task_status(task.id, user_id, task.status.clone());
         }
 
-        self.context.tasks = self.repo.get_all_tasks();
+        self.context.tasks = self.repo.get_tasks_user_local(user_id);
     }
 }
