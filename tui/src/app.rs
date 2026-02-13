@@ -346,8 +346,8 @@ impl App {
 
     pub fn update_context(&mut self) {
         let user_id = self.context.user.as_ref().unwrap().id;
-        self.repo.load_tasks(user_id);
         let tasks = self.context.tasks.as_mut().expect("While working with db:");
+        self.repo.load_new_tasks(user_id, tasks);
         for task in tasks.iter_mut() {
             let attempts = task.attempts.as_ref().expect("While working with db:");
             if attempts.is_empty() {

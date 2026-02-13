@@ -467,16 +467,24 @@ impl Repo {
     //     );
     // }
 
-    pub fn load_tasks(&self, user_id: i64) -> Result<()> {
+    pub fn load_new_tasks(&self, user_id: i64, loaded_tasks: &Vec<Task>) -> Result<()> {
         let conn = &self.connection;
         let task_models = self.get_all_tasks()?;
 
         for task_model in task_models {
-            conn.execute(
-                "INSERT INTO user_task_statuses (user_id, task_id, status)
+            let mut found = false;
+            for task in loaded_tasks {
+                if task.id == task_model.id {
+                    found = true;
+                }
+            }
+            if !found {
+                conn.execute(
+                    "INSERT INTO user_task_statuses (user_id, task_id, status)
              VALUES (?1, ?2, ?3)",
-                params![user_id, task_model.id, 0],
-            )?;
+                    params![user_id, task_model.id, 0],
+                )?;
+            }
         }
         Ok(())
     }
@@ -757,7 +765,7 @@ impl Repo {
         };
 
         conn.execute(
-            "UPDATE user_task_statuses SET status = ?1 WHERE task_id = ?2, user_id = ?3",
+            "UPDATE user_task_statuses SET status = ?1 WHERE task_id = ?2 AND user_id = ?3",
             params![status, task_id, user_id],
         )?;
         Ok(())
