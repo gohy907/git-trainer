@@ -46,11 +46,18 @@ RUN mkdir -p /etc/git-trainer
 RUN mkdir -p /etc/git-trainer/tests
 RUN echo -n 0 > /etc/git-trainer/status
 
-ENV DESCRIPTION="Давайте начнём с чего-нибудь лёгкого.\nСоздайте в папке \"hello-world\" новый Git репозиторий, в котором напишите код на C, выводящий на экран строчку \"Hello, World!\".\nПосле этого сделайте ровно один коммит, добавляющий этот код, с названием \"Initial commit\"."
-
-RUN echo -n $DESCRIPTION > /etc/git-trainer/description
-
 USER $USERNAME
 RUN git config --global user.name "$GIT_USERNAME" && \
     git config --global user.email "$GIT_EMAIL" && \
     git config --global --add safe.directory /home/$USERNAME
+
+# Вот с этой строчки и ниже вы можете изменять этот Dockerfile для создания новых заданий. То, что находится выше, не стоит трогать ради однообразия образов
+
+# Вот так стоит добавлять репозитории в образ. В случае с заданием hello-world никакого репозитория не требуется, поэтому ничего и не копируется
+# COPY tasks/hello-world/src/repo hello-world 
+
+
+ENV DESCRIPTION="Давайте начнём с чего-нибудь лёгкого.\nСоздайте в папке \"hello-world\" новый Git репозиторий, в котором напишите код на C, выводящий на экран строчку \"Hello, World!\".\nПосле этого сделайте ровно один коммит, добавляющий этот код, с названием \"Initial commit\"."
+
+RUN echo -n $DESCRIPTION > /etc/git-trainer/description
+
