@@ -42,19 +42,8 @@ CREATE TABLE IF NOT EXISTS user_task_statuses (
     UNIQUE(user_id, task_id)
 );
 
-INSERT INTO tasks (
-    id,
-    name,
-    work_name,
-    description,
-    extended_description
-)
-VALUES (
-    1,
-    'Привет, мир!',
-    'hello-world',
-    'В этой задаче Вам предстоит создать новый Git репозиторий и сделать в нём первый коммит.',
-    'Давайте начнём с чего-нибудь лёгкого.n
-    Создайте в папке "hello-world" новый Git репозиторий, в котором напишите код на C, выводящий на экран строчку "Hello, World!".n 
-    После этого сделайте ровно один коммит, добавляющий этот код, с названием "Initial commit".'
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    migration_name TEXT NOT NULL UNIQUE,
+    applied_at TEXT NOT NULL
 );

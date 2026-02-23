@@ -2,6 +2,8 @@ use chrono::{DateTime, Local, ParseError, Utc};
 use core::fmt;
 use rusqlite::{Connection, Result, params};
 use std::fs;
+use std::path::Path;
+use thiserror::Error;
 
 pub struct TaskModel {
     pub id: i64,
@@ -272,6 +274,15 @@ impl From<UserTaskStatus> for TaskStatus {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum RunMigrationsError {
+    #[error("No migrations directory found")]
+    NoDirectory(),
+
+    #[error("While working with SQL: {0}")]
+    SQLiteError(#[from] rusqlite::Error),
+}
+
 impl Repo {
     pub fn init_database() -> Self {
         #[cfg(debug_assertions)]
@@ -292,8 +303,9 @@ impl Repo {
 
         conn.execute_batch(&schema_sql)
             .expect("Failed to execute schema.sql");
-
-        Repo { connection: conn }
+        let mut repo = Repo { connection: conn };
+        repo.run_migrations().unwrap();
+        repo
     }
 
     pub fn get_task_attempts_user_local(&self, user_id: i64, task_id: i64) -> Result<Vec<Attempt>> {
@@ -769,5 +781,82 @@ impl Repo {
             params![status, task_id, user_id],
         )?;
         Ok(())
+    }
+
+    pub fn run_migrations(&mut self) -> Result<(), RunMigrationsError> {
+        #[cfg(debug_assertions)]
+        let migrations_dir = "migrations";
+
+        #[cfg(not(debug_assertions))]
+        let migrations_dir = "/var/lib/git-trainer/migrations";
+
+        let migrations_dir = Path::new(migrations_dir);
+        if !migrations_dir.exists() {
+            return Err(RunMigrationsError::NoDirectory());
+        }
+
+        self.connection.execute_batch(
+            "CREATE TABLE IF NOT EXISTS schema_migrations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                migration_name TEXT NOT NULL UNIQUE,
+                applied_at TEXT NOT NULL
+            )",
+        )?;
+
+        let read_dir = match std::fs::read_dir(&migrations_dir) {
+            Ok(dir) => dir,
+            Err(_) => return Ok(()),
+        };
+
+        for entry_result in read_dir {
+            let entry = match entry_result {
+                Ok(entry) => entry,
+                Err(_) => continue,
+            };
+
+            if !entry.path().is_dir() {
+                continue;
+            }
+
+            let mig_name = entry.file_name().to_string_lossy().to_string();
+
+            if self.is_migration_applied(&mig_name)? {
+                continue;
+            }
+
+            let tx = self.connection.transaction()?;
+            let up_path = entry.path().join("up.sql");
+
+            if !up_path.exists() {
+                let _ = tx.rollback();
+                continue;
+            }
+
+            let up_sql = match std::fs::read_to_string(&up_path) {
+                Ok(sql) => sql,
+                Err(_) => {
+                    let _ = tx.rollback();
+                    continue;
+                }
+            };
+
+            tx.execute_batch(&up_sql)?;
+
+            let now = Utc::now().to_rfc3339();
+            tx.execute(
+                "INSERT INTO schema_migrations (migration_name, applied_at) VALUES (?1, ?2)",
+                params![&mig_name, &now],
+            )?;
+
+            tx.commit()?;
+        }
+        Ok(())
+    }
+
+    fn is_migration_applied(&self, name: &str) -> Result<bool> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT 1 FROM schema_migrations WHERE migration_name = ?1")?;
+        Ok(stmt.exists(params![name])?)
     }
 }
