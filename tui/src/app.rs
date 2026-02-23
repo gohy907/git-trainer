@@ -323,7 +323,7 @@ impl App {
             }
         }
 
-        let _ = docker::exec_command(task, "sudo rm -rf /etc/git-trainer/tests/").await;
+        let _ = docker::exec_command(task, "sudo rm -rf /etc/git-trainer/tests/*").await;
 
         let user_id = self
             .context
