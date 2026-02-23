@@ -281,7 +281,6 @@ impl App {
 
         #[cfg(not(debug_assertions))]
         let path = format!("/var/lib/git-trainer/tests/{}", task.work_name);
-        println!("{}", path);
 
         let count = fs::read_dir(&path)
             .expect("No test directory for task")
@@ -323,6 +322,8 @@ impl App {
                 });
             }
         }
+
+        let _ = docker::exec_command(task, "sudo rm -rf /etc/git-trainer/tests/").await;
 
         let user_id = self
             .context
