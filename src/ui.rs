@@ -306,7 +306,7 @@ fn render_popup(frame: &mut Frame, app: &App) {
                         1,
                     );
                     let lines_of_popup = vec![
-                        popup_line(wrapped_desc, Color::LightBlue),
+                        popup_line(wrapped_desc, Color::LightBlue), //                        ВОТ ЗДЕСЬ ОШИБКА
                         popup_line("Нажмите Enter, чтобы продолжить", Color::LightBlue),
                     ];
 
