@@ -5,60 +5,12 @@ use std::fs;
 use std::path::Path;
 use thiserror::Error;
 
-pub struct TaskModel {
+/// TaskEntity represents single task object in database
+pub struct TaskEntity {
     pub id: i64,
     pub name: String,
     pub work_name: String,
     pub description: String,
-    pub extended_description: String,
-}
-
-struct TaskEntity {
-    id: i64,
-    name: String,
-    work_name: String,
-    description: String,
-    extended_description: String,
-    status: i64,
-}
-
-impl From<&TaskModel> for TaskEntity {
-    fn from(value: &TaskModel) -> Self {
-        Self {
-            id: value.id,
-            name: value.name.clone(),
-            work_name: value.work_name.clone(),
-            description: value.description.clone(),
-            extended_description: value.extended_description.clone(),
-            status: 0,
-        }
-    }
-}
-
-pub struct TaskPayload {
-    name: String,
-    work_name: String,
-    description: String,
-    extended_description: String,
-    status: i64,
-}
-
-impl From<&Task> for TaskPayload {
-    fn from(task: &Task) -> Self {
-        TaskPayload {
-            name: task.name.clone(),
-            work_name: task.work_name.clone(),
-            description: task.description.clone(),
-            extended_description: task.extended_description.clone(),
-            status: match task.status {
-                TaskStatus::NotInProgress => 0,
-                TaskStatus::InProgress => 1,
-                TaskStatus::Done => 2,
-                TaskStatus::Approved => 3,
-                TaskStatus::Pending => 4,
-            },
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -89,35 +41,8 @@ pub struct Task {
     pub image_name: String,
     pub container_name: String,
     pub description: String,
-    pub extended_description: String,
     pub status: TaskStatus,
     pub attempts: Result<Vec<Attempt>>,
-}
-
-impl From<TaskEntity> for Task {
-    fn from(task_entity: TaskEntity) -> Self {
-        let username = whoami::username()
-            .expect("While getting username:")
-            .to_string()
-            .replace(" ", "-");
-        Task {
-            id: task_entity.id,
-            name: task_entity.name,
-            work_name: task_entity.work_name.clone(),
-            container_name: format!("git-trainer_{}_{}", task_entity.work_name, username),
-            image_name: format!("git-trainer:{}", task_entity.work_name),
-            description: task_entity.description,
-            extended_description: task_entity.extended_description,
-            status: match task_entity.status {
-                0 => TaskStatus::NotInProgress,
-                1 => TaskStatus::InProgress,
-                2 => TaskStatus::Done,
-                3 => TaskStatus::Approved,
-                _ => TaskStatus::Pending,
-            },
-            attempts: Repo::get_task_attempts(&Repo::init_database(), task_entity.id),
-        }
-    }
 }
 
 struct AttemptEntity {
@@ -137,15 +62,11 @@ pub fn format_timestamp(timestamp_str: &str) -> Result<String, ParseError> {
 
 pub struct Attempt {
     pub id: i64,
-    pub user_id: i64,
-    pub task_id: i64,
     pub timestamp: Result<String, ParseError>,
     pub tests: Result<Vec<Test>>,
 }
 
 pub struct NewAttemptEntity {
-    pub user_id: i64,
-    pub task_id: i64,
     pub tests: Vec<NewTestEntity>,
 }
 
@@ -153,8 +74,6 @@ impl From<AttemptEntity> for Attempt {
     fn from(attempt_entity: AttemptEntity) -> Self {
         Attempt {
             id: attempt_entity.id,
-            user_id: attempt_entity.user_id,
-            task_id: attempt_entity.task_id,
             timestamp: format_timestamp(&attempt_entity.timestamp),
             tests: Repo::get_attempt_tests(&Repo::init_database(), attempt_entity.id),
         }
@@ -164,8 +83,6 @@ impl From<AttemptEntity> for Attempt {
 impl From<Attempt> for NewAttemptEntity {
     fn from(attempt: Attempt) -> Self {
         NewAttemptEntity {
-            user_id: attempt.user_id,
-            task_id: attempt.task_id,
             tests: attempt
                 .tests
                 .expect("While working with db:")
@@ -182,16 +99,12 @@ pub struct NewTestEntity {
 }
 
 struct TestEntity {
-    id: i64,
-    attempt_id: i64,
     description: String,
     result: i64,
 }
 
 #[derive(Clone)]
 pub struct Test {
-    pub id: i64,
-    pub attempt_id: i64,
     pub description: String,
     pub result: TestResult,
 }
@@ -199,8 +112,6 @@ pub struct Test {
 impl From<TestEntity> for Test {
     fn from(test_entity: TestEntity) -> Self {
         Test {
-            id: test_entity.id,
-            attempt_id: test_entity.attempt_id,
             description: test_entity.description,
             result: match test_entity.result {
                 0 => TestResult::Passed,
@@ -226,21 +137,15 @@ impl From<Test> for NewTestEntity {
 
 struct UserEntity {
     id: i64,
-    username: String,
-    created_at: String,
 }
 
 pub struct User {
     pub id: i64,
-    pub username: String,
 }
 
 impl From<UserEntity> for User {
     fn from(user_entity: UserEntity) -> Self {
-        User {
-            id: user_entity.id,
-            username: user_entity.username,
-        }
+        User { id: user_entity.id }
     }
 }
 
@@ -256,8 +161,6 @@ pub struct Repo {
 }
 
 pub struct UserTaskStatus {
-    pub id: i64,
-    pub user_id: i64,
     pub task_id: i64,
     pub status: i64,
 }
@@ -311,8 +214,8 @@ impl Repo {
     pub fn get_task_attempts_user_local(&self, user_id: i64, task_id: i64) -> Result<Vec<Attempt>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, timestamp 
-         FROM attempts WHERE user_id = ?1 AND task_id = ?2 
+            "SELECT id, user_id, task_id, timestamp
+         FROM attempts WHERE user_id = ?1 AND task_id = ?2
          ORDER BY timestamp DESC",
         )?;
 
@@ -326,7 +229,7 @@ impl Repo {
 
             attempts.push(
                 AttemptEntity {
-                    id: id,
+                    id,
                     user_id,
                     task_id,
                     timestamp,
@@ -341,35 +244,15 @@ impl Repo {
     pub fn get_tasks_user_local(&self, user_id: i64) -> Result<Vec<Task>> {
         let conn = &self.connection;
 
-        // let mut stmt = conn.prepare(
-        //     "SELECT id, attempt_id, description, result
-        //  FROM attempt_tests WHERE attempt_id = ?1
-        //  ORDER BY id",
-        // )?;
-        //
-        // let tests = stmt.query_map([attempt_id], |row| {
-        //     Ok(TestEntity {
-        //         id: row.get(0)?,
-        //         attempt_id: row.get(1)?,
-        //         description: row.get(2)?,
-        //         result: row.get(3)?,
-        //     }
-        //     .into())
-        // })?;
-
-        // println!("{}", user_id);
-
         let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, status 
-             FROM user_task_statuses 
+            "SELECT id, user_id, task_id, status
+             FROM user_task_statuses
              WHERE user_id = ?1
              ORDER BY task_id",
         )?;
 
         let statuses = stmt.query_map([user_id], |row| {
             let user_task_status = UserTaskStatus {
-                id: row.get(0)?,
-                user_id: row.get(1)?,
                 task_id: row.get(2)?,
                 status: row.get(3)?,
             };
@@ -388,7 +271,6 @@ impl Repo {
                 work_name: task_model.work_name.clone(),
                 image_name: format!("git-trainer:{}", task_model.work_name),
                 description: task_model.description,
-                extended_description: task_model.extended_description,
                 status: match user_task_status.status {
                     0 => TaskStatus::NotInProgress,
                     1 => TaskStatus::InProgress,
@@ -407,48 +289,40 @@ impl Repo {
         conn.query_row(
             "SELECT username FROM users WHERE id = ?1",
             [user_id],
-            |row| Ok(row.get(0)?),
+            |row| row.get(0),
         )
     }
 
-    pub fn get_task_by_id(&self, task_id: i64) -> Result<TaskModel> {
+    pub fn get_task_by_id(&self, task_id: i64) -> Result<TaskEntity> {
         let conn = &self.connection;
         conn.query_row(
             "SELECT id, name, work_name, description, extended_description FROM tasks WHERE id = ?1",
             [task_id],
             |row| {
-                Ok(TaskModel {
+                Ok(TaskEntity {
                     id: row.get(0)?,
                     name: row.get(1)?,
                     work_name: row.get(2)?,
                     description: row.get(3)?,
-                    extended_description: row.get(4)?
                 })
             }
         )
     }
 
-    pub fn get_all_tasks(&self) -> Result<Vec<TaskModel>> {
+    pub fn get_all_tasks(&self) -> Result<Vec<TaskEntity>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare("SELECT * FROM tasks")?;
         let task_rows = stmt.query_map([], |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                row.get(3)?,
-                row.get(4)?,
-            ))
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
         })?;
         let mut task_models = Vec::new();
         for task_row in task_rows {
-            let (id, name, work_name, description, extended_description) = task_row?;
-            task_models.push(TaskModel {
-                id: id,
-                name: name,
-                work_name: work_name,
-                description: description,
-                extended_description: extended_description,
+            let (id, name, work_name, description) = task_row?;
+            task_models.push(TaskEntity {
+                id,
+                name,
+                work_name,
+                description,
             });
         }
 
@@ -526,30 +400,6 @@ impl Repo {
 
         tx.commit()?;
         Ok(user_id)
-
-        // let conn = &mut self.connection;
-        // let tx = conn.transaction()?;
-        //
-        // let now = Utc::now().to_rfc3339();
-        //
-        // tx.execute(
-        //     "INSERT INTO attempts (user_id, task_id, timestamp)
-        //  VALUES (?1, ?2, ?3)",
-        //     params![user_id, task_id, now],
-        // )?;
-        //
-        // let attempt_id = tx.last_insert_rowid();
-        //
-        // for test in attempt.tests {
-        //     tx.execute(
-        //         "INSERT INTO attempt_tests (attempt_id, description, result)
-        //      VALUES (?1, ?2, ?3)",
-        //         params![attempt_id, test.description, test.result],
-        //     )?;
-        // }
-        //
-        // tx.commit()?;
-        // Ok(attempt_id)
     }
 
     pub fn user_exists(&self, username: &str) -> Result<bool> {
@@ -559,7 +409,7 @@ impl Repo {
             |row| row.get(0),
         )?;
 
-        Ok(if count > 0 { true } else { false })
+        Ok(count > 0)
     }
 
     pub fn get_tasks_count(&self) -> Result<usize> {
@@ -578,8 +428,6 @@ impl Repo {
             |row| {
                 Ok(UserEntity {
                     id: row.get(0)?,
-                    username: row.get(1)?,
-                    created_at: row.get(2)?,
                 }
                 .into())
             },
@@ -620,7 +468,7 @@ impl Repo {
     pub fn get_attempt_by_id(&self, attempt_id: i64) -> Result<Attempt> {
         let conn = &self.connection;
         conn.query_row(
-            "SELECT id, user_id, task_id, timestamp 
+            "SELECT id, user_id, task_id, timestamp
         FROM attempts WHERE id = ?1",
             [attempt_id],
             |row| {
@@ -638,8 +486,8 @@ impl Repo {
     pub fn get_user_attempts(&self, user_id: i64) -> Result<Vec<Attempt>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, timestamp 
-         FROM attempts WHERE user_id = ?1 
+            "SELECT id, user_id, task_id, timestamp
+         FROM attempts WHERE user_id = ?1
          ORDER BY timestamp DESC",
         )?;
 
@@ -653,7 +501,7 @@ impl Repo {
 
             attempts.push(
                 AttemptEntity {
-                    id: id,
+                    id,
                     user_id,
                     task_id,
                     timestamp,
@@ -683,10 +531,10 @@ impl Repo {
 
             attempts.push(
                 AttemptEntity {
-                    id: id,
-                    user_id: user_id,
-                    task_id: task_id,
-                    timestamp: timestamp,
+                    id,
+                    user_id,
+                    task_id,
+                    timestamp,
                 }
                 .into(),
             );
@@ -710,15 +558,13 @@ impl Repo {
     pub fn get_attempt_tests(&self, attempt_id: i64) -> Result<Vec<Test>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
-            "SELECT id, attempt_id, description, result 
-         FROM attempt_tests WHERE attempt_id = ?1 
+            "SELECT id, attempt_id, description, result
+         FROM attempt_tests WHERE attempt_id = ?1
          ORDER BY id",
         )?;
 
         let tests = stmt.query_map([attempt_id], |row| {
             Ok(TestEntity {
-                id: row.get(0)?,
-                attempt_id: row.get(1)?,
                 description: row.get(2)?,
                 result: row.get(3)?,
             }
@@ -736,8 +582,6 @@ impl Repo {
             [test_id],
             |row| {
                 Ok(TestEntity {
-                    id: row.get(0)?,
-                    attempt_id: row.get(1)?,
                     description: row.get(2)?,
                     result: row.get(3)?,
                 }
@@ -749,8 +593,8 @@ impl Repo {
     pub fn get_last_attempt(&self, user_id: i64, task_id: i64) -> Result<Attempt> {
         let conn = &self.connection;
         let attempt_id: i64 = conn.query_row(
-            "SELECT id FROM attempts 
-         WHERE user_id = ?1 AND task_id = ?2 
+            "SELECT id FROM attempts
+         WHERE user_id = ?1 AND task_id = ?2
          ORDER BY timestamp DESC LIMIT 1",
             params![user_id, task_id],
             |row| row.get(0),
@@ -803,7 +647,7 @@ impl Repo {
             )",
         )?;
 
-        let read_dir = match std::fs::read_dir(&migrations_dir) {
+        let read_dir = match std::fs::read_dir(migrations_dir) {
             Ok(dir) => dir,
             Err(_) => return Ok(()),
         };
@@ -857,6 +701,6 @@ impl Repo {
         let mut stmt = self
             .connection
             .prepare("SELECT 1 FROM schema_migrations WHERE migration_name = ?1")?;
-        Ok(stmt.exists(params![name])?)
+        stmt.exists(params![name])
     }
 }

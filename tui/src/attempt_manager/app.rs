@@ -133,12 +133,9 @@ impl App {
             return;
         }
 
-        let i = match self
-            .attempt_manager_config
-            .tests_table_config
-            .list_state
-            .selected()
-        {
+        let table_config = &mut self.attempt_manager_config.tests_table_config;
+
+        let i = match table_config.list_state.selected() {
             Some(i) => {
                 if i == 0 {
                     tests.len() - 1
@@ -148,48 +145,8 @@ impl App {
             }
             None => 0,
         };
-        self.attempt_manager_config
-            .tests_table_config
-            .list_state
-            .select(Some(i));
-        self.attempt_manager_config
-            .tests_table_config
-            .list_state
-            .select(Some(i));
-        self.attempt_manager_config
-            .tests_table_config
-            .scrollbar_state = self
-            .attempt_manager_config
-            .tests_table_config
-            .scrollbar_state
-            .position(i);
-        self.attempt_manager_config
-            .tests_table_config
-            .test_under_cursor = i;
-    }
-
-    pub fn tests_handle_events(&mut self) -> io::Result<()> {
-        if let Event::Key(key) = event::read()? {
-            match key.code {
-                KeyCode::Down | KeyCode::Char('j') => {
-                    self.next_test();
-                }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    self.previous_test();
-                }
-                // KeyCode::Home | KeyCode::Char('g') => {
-                //     self.tests_list_state.select(Some(0));
-                //     self.tests_scrollbar_state = self.tests_scrollbar_state.position(0);
-                // }
-                // KeyCode::End | KeyCode::Char('G') => {
-                //     let tests = self.tests_of_choosed_attempt();
-                //     let last = tests.len() - 1;
-                //     self.tests_list_state.select(Some(last));
-                //     self.tests_scrollbar_state = self.tests_scrollbar_state.position(last);
-                // }
-                _ => {}
-            }
-        }
-        Ok(())
+        table_config.list_state.select(Some(i));
+        table_config.scrollbar_state = table_config.scrollbar_state.position(i);
+        table_config.test_under_cursor = i;
     }
 }

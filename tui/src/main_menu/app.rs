@@ -90,9 +90,6 @@ impl App {
     }
 
     fn is_popup_active(&self) -> bool {
-        match self.active_popup {
-            Some(_) => true,
-            _ => false,
-        }
+        self.active_popup.is_some()
     }
 }
