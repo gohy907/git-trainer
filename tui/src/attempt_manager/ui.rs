@@ -39,7 +39,7 @@ impl App {
 
         let span_status_style = match task_status {
             TaskStatus::NotInProgress => Span::from(task_status.to_string()).fg(Color::Red),
-            TaskStatus::InProgress => Span::from(task_status.to_string().fg(Color::Yellow)),
+            TaskStatus::InProgress => task_status.to_string().fg(Color::Yellow),
             TaskStatus::Done => Span::from(task_status.to_string()).fg(Color::Blue),
             TaskStatus::Approved => Span::from(task_status.to_string()).fg(Color::LightGreen),
             _ => Span::from(task_status.to_string()).fg(Color::DarkGray),
@@ -94,21 +94,17 @@ pub fn render_attempts_table(frame: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 Style::new().fg(Color::Red)
             }
+        } else if app
+            .attempt_manager_config
+            .attempts_table_config
+            .attempt_under_cursor
+            == i
+        {
+            Style::new()
+        } else if passed_count == total_count {
+            Style::new().fg(Color::LightGreen)
         } else {
-            if app
-                .attempt_manager_config
-                .attempts_table_config
-                .attempt_under_cursor
-                == i
-            {
-                Style::new()
-            } else {
-                if passed_count == total_count {
-                    Style::new().fg(Color::LightGreen)
-                } else {
-                    Style::new().fg(Color::Red)
-                }
-            }
+            Style::new().fg(Color::Red)
         };
         let row = Row::new(vec![
             attempt
@@ -255,34 +251,27 @@ pub fn render_tests_table(frame: &mut Frame, app: &mut App, area: Rect) {
             format!("Тесты: пройдены не все ({}/{})", passed_count, total_count)
         }
     } else {
-        format!("Попыток ещё нет.")
+        "Попыток ещё нет.".to_string()
     };
     let items: Vec<ListItem> = tests
         .iter()
         .enumerate()
         .map(|(i, test)| {
-            let style =
-                if app.attempt_manager_config.status == AttemptManagerStatus::SelectingAttempts {
-                    match test.result {
-                        TestResult::Passed => Style::default().fg(Color::LightGreen),
-                        TestResult::Failed => Style::default().fg(Color::Red),
-                        TestResult::NotExecuted => Style::default().fg(Color::DarkGray),
-                    }
-                } else {
-                    if i != app
-                        .attempt_manager_config
-                        .tests_table_config
-                        .test_under_cursor
-                    {
-                        match test.result {
-                            TestResult::Passed => Style::default().fg(Color::LightGreen),
-                            TestResult::Failed => Style::default().fg(Color::Red),
-                            TestResult::NotExecuted => Style::default().fg(Color::DarkGray),
-                        }
-                    } else {
-                        Style::default()
-                    }
-                };
+            let style = if app.attempt_manager_config.status
+                == AttemptManagerStatus::SelectingAttempts
+                || i != app
+                    .attempt_manager_config
+                    .tests_table_config
+                    .test_under_cursor
+            {
+                match test.result {
+                    TestResult::Passed => Style::default().fg(Color::LightGreen),
+                    TestResult::Failed => Style::default().fg(Color::Red),
+                    TestResult::NotExecuted => Style::default().fg(Color::DarkGray),
+                }
+            } else {
+                Style::default()
+            };
 
             let max_width = area.width.saturating_sub(4) as usize;
             let lines = wrap_text(&test.description, max_width);

@@ -5,44 +5,14 @@ use bollard::container::AttachContainerResults;
 use bollard::exec::{CreateExecOptions, StartExecResults};
 use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{
-    AttachContainerOptionsBuilder, BuildImageOptionsBuilder, CreateContainerOptionsBuilder,
-    InspectContainerOptions, RemoveContainerOptionsBuilder, ResizeContainerTTYOptionsBuilder,
-    StartContainerOptionsBuilder, UploadToContainerOptionsBuilder,
+    AttachContainerOptionsBuilder, CreateContainerOptionsBuilder, InspectContainerOptions,
+    RemoveContainerOptionsBuilder, ResizeContainerTTYOptionsBuilder, StartContainerOptionsBuilder,
+    UploadToContainerOptionsBuilder,
 };
 use bytes::Bytes;
 use tar::Builder;
 
 use futures_util::StreamExt;
-use std::env;
-use std::fs::File;
-use std::io::Read;
-use std::path::PathBuf;
-use thiserror::Error;
-use tokio::io;
-
-#[derive(Debug, Error)]
-pub enum BuildError {
-    #[error("Connection to Docker is not established: {0}")]
-    DockerConnection(#[from] bollard::errors::Error),
-
-    #[error("IO error: {0}")]
-    IOError(#[from] io::Error),
-
-    #[error("Env error: {0}")]
-    EnvError(#[from] env::VarError),
-}
-
-fn tasks_root() -> PathBuf {
-    #[cfg(debug_assertions)]
-    {
-        PathBuf::from("tasks")
-    }
-
-    #[cfg(not(debug_assertions))]
-    {
-        PathBuf::from("/etc/git-trainer/tasks")
-    }
-}
 
 fn docker_connect() -> Result<Docker, bollard::errors::Error> {
     Docker::connect_with_socket_defaults()
@@ -59,11 +29,9 @@ pub async fn ensure_task_container_running(task: &Task) -> Result<(), bollard::e
         .await
     {
         Ok(_) => true,
-        Err(bollard::errors::Error::DockerResponseServerError { status_code, .. })
-            if status_code == 404 =>
-        {
-            false
-        }
+        Err(bollard::errors::Error::DockerResponseServerError {
+            status_code: 404, ..
+        }) => false,
         Err(e) => return Err(e),
     };
 
@@ -110,44 +78,14 @@ pub async fn ensure_task_container_created(task: &Task) -> Result<String, bollar
         Ok(info) => {
             return Ok(info.id.unwrap());
         }
-        Err(bollard::errors::Error::DockerResponseServerError { status_code, .. })
-            if status_code == 404 => {}
+        Err(bollard::errors::Error::DockerResponseServerError {
+            status_code: 404, ..
+        }) => {}
         Err(e) => {
-            return Err(e.into());
+            return Err(e);
         }
     }
     create_task_container(task).await
-}
-
-// TODO: REMOVE 'BASICS' DIRECTORY FROM TASKS, IT'S REDUNDANT FOR NOW
-pub async fn build_task_image(task: &Task) -> Result<(), BuildError> {
-    let docker = docker_connect()?;
-
-    let name_of_image = task.image_name.clone();
-
-    let build_options = BuildImageOptionsBuilder::new()
-        .dockerfile("src/Dockerfile")
-        .t(&name_of_image)
-        .build();
-
-    let mut file = File::open(tasks_root().join(&task.work_name).join("src.tar.gz"))?;
-    let mut contents = Vec::new();
-    file.read_to_end(&mut contents)?;
-
-    let mut build_stream =
-        docker.build_image(build_options, None, Some(body_full(contents.into())));
-    while let Some(result) = build_stream.next().await {
-        match result {
-            Ok(output) => {
-                if let Some(stream) = output.stream {
-                    print!("{}", stream);
-                }
-            }
-            Err(e) => eprintln!("Build error: {}", e),
-        }
-    }
-
-    Ok(())
 }
 
 pub async fn delete_task_container(task: &Task) -> Result<(), bollard::errors::Error> {
@@ -162,28 +100,14 @@ pub async fn delete_task_container(task: &Task) -> Result<(), bollard::errors::E
 pub async fn restart_task(task: &Task) -> Result<(), bollard::errors::Error> {
     match delete_task_container(task).await {
         Ok(_) => {}
-        Err(bollard::errors::Error::DockerResponseServerError { status_code, .. })
-            if status_code == 404 => {}
+        Err(bollard::errors::Error::DockerResponseServerError {
+            status_code: 404, ..
+        }) => {}
         Err(e) => return Err(e),
     }
 
     create_task_container(task).await?;
     Ok(())
-}
-
-#[derive(Debug, Error)]
-#[error("Docker error: {message}")]
-pub struct DockerRunTaskError {
-    pub message: String,
-}
-
-#[derive(Debug, Error)]
-pub enum RunTaskError {
-    #[error("While running the command: {0}")]
-    IOError(#[from] io::Error),
-
-    #[error("Docker exited with code: {0}")]
-    DockerError(#[from] DockerRunTaskError),
 }
 
 pub async fn start_container(task: &Task) -> Result<(), bollard::errors::Error> {
@@ -265,7 +189,7 @@ pub async fn exec_command(task: &Task, cmd: &str) -> Result<CmdOutput, bollard::
 
     Ok(CmdOutput {
         output: result,
-        exit_code: exit_code,
+        exit_code,
     })
 }
 

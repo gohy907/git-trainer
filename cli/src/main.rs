@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
+use std::fs;
 use std::io;
 use std::io::Write;
-use std::fs;
 
 #[derive(Parser)]
 #[command(name = "git-trainer CLI")]
@@ -16,7 +16,7 @@ struct Cli {
 enum Commands {
     /// Перезагрузить текущее задание
     Restart {
- #[arg(short = 'y', long = "yes")]
+        #[arg(short = 'y', long = "yes")]
         yes: bool,
     },
 
@@ -28,17 +28,15 @@ enum Commands {
 }
 
 fn confirm(question: &str) -> io::Result<bool> {
-    loop {
-        print!("{question} [Y/n]: ");
-        io::stdout().flush()?;
+    print!("{question} [Y/n]: ");
+    io::stdout().flush()?;
 
-        let mut line = String::new();
-        io::stdin().read_line(&mut line)?;
+    let mut line = String::new();
+    io::stdin().read_line(&mut line)?;
 
-        match line.trim().to_lowercase().as_str() {
-            ""| "y" | "yes" => return Ok(true),
-            _  => return Ok(false),
-        }
+    match line.trim().to_lowercase().as_str() {
+        "" | "y" | "yes" => Ok(true),
+        _ => Ok(false),
     }
 }
 
@@ -47,7 +45,9 @@ fn main() -> io::Result<()> {
 
     match cli.command {
         Commands::Restart { yes } => {
-            if !yes && !confirm("Перезагрузить текущее задание? Вы потеряете весь текущий прогресс.")? {
+            if !yes
+                && !confirm("Перезагрузить текущее задание? Вы потеряете весь текущий прогресс.")?
+            {
                 return Ok(());
             }
             fs::write("/etc/git-trainer/status", "1")?;

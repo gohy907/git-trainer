@@ -1,6 +1,4 @@
-use crate::App;
 use crate::Frame;
-use crate::db::Task;
 use ratatui::layout::Constraint;
 use ratatui::layout::{Alignment, Flex};
 use ratatui::prelude::{Layout, Rect};
@@ -19,7 +17,6 @@ pub enum Popup {
     ResetConfirmation,
     ResetDone,
     Error(String),
-    Help,
 }
 
 struct PopupConfig {
@@ -31,7 +28,7 @@ struct PopupConfig {
 }
 
 impl Popup {
-    fn config(&self, app: &App, frame: &mut Frame) -> PopupConfig {
+    fn config(&self, frame: &mut Frame) -> PopupConfig {
         match self {
             Popup::RunConifrmation => PopupConfig {
                 title: Some("Подтвердите выбор".to_string()),
@@ -40,8 +37,8 @@ impl Popup {
                     Line::from("Enter — подтвердить, Esc — отменить").fg(Color::LightBlue),
                 ],
                 color: Color::LightBlue,
-                width: frame.area().width * 1 / 3,
-                height: frame.area().height * 1 / 3,
+                width: frame.area().width / 3,
+                height: frame.area().height / 3,
             },
 
             Popup::ResetConfirmation => PopupConfig {
@@ -52,8 +49,8 @@ impl Popup {
                     Line::from("Enter — подтвердить, Esc — отменить").fg(Color::LightBlue),
                 ],
                 color: Color::LightBlue,
-                width: frame.area().width * 1 / 3,
-                height: frame.area().height * 1 / 3,
+                width: frame.area().width / 3,
+                height: frame.area().height / 3,
             },
 
             Popup::Error(error) => PopupConfig {
@@ -75,42 +72,22 @@ impl Popup {
                     Line::from("Нажмите Enter, чтобы продолжить").fg(Color::LightGreen),
                 ],
                 color: Color::LightGreen,
-                width: frame.area().width * 1 / 3,
-                height: frame.area().height * 1 / 3,
+                width: frame.area().width / 3,
+                height: frame.area().height / 3,
             },
-
-            Popup::Help => {
-                // let desc = &app.config.tasks[app.task_under_cursor].extended_desc;
-
-                let mut lines = Vec::new();
-
-                for line in app.task_under_cursor().extended_description.lines() {
-                    lines.push(Line::from(line.to_string()).fg(Color::LightBlue));
-                }
-                lines.push(Line::from(""));
-                lines.push(Line::from("Нажмите Enter, чтобы продолжить").fg(Color::LightBlue));
-                PopupConfig {
-                    title: None,
-                    lines: lines,
-                    color: Color::LightBlue,
-                    width: frame.area().width * 2 / 3,
-                    height: frame.area().height * 2 / 3,
-                }
-            }
         }
     }
 
-    pub fn render(&self, frame: &mut Frame, app: &App) {
-        let config = self.config(app, frame);
+    pub fn render(&self, frame: &mut Frame) {
+        let config = self.config(frame);
         let lines_of_popup = config.lines;
 
         let mut popup_block = Block::bordered()
             .fg(config.color)
             .title_alignment(Alignment::Center);
 
-        match config.title {
-            Some(title) => popup_block = popup_block.title(title),
-            None => {}
+        if let Some(title) = config.title {
+            popup_block = popup_block.title(title)
         }
 
         let popup_content = Paragraph::new(lines_of_popup)
