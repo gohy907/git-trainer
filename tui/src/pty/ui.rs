@@ -93,7 +93,7 @@ impl App {
         frame.render_widget(explanation, chunks[2]);
 
         if let Some(popup) = &self.active_popup {
-            popup.render(frame, self);
+            popup.render(frame);
         }
     }
 
@@ -148,10 +148,10 @@ impl App {
                                 LogOutput::Console { ref message } => message.as_ref(),
                             };
 
-                            if !bytes.is_empty() {
-                                if let Ok(mut p) = parser.write() {
-                                    let _ = p.write_all(bytes);
-                                }
+                            if !bytes.is_empty()
+                                && let Ok(mut p) = parser.write()
+                            {
+                                let _ = p.write_all(bytes);
                             }
                         }
                         Err(e) => {
@@ -200,14 +200,14 @@ impl App {
         let mut handles = Vec::new();
         loop {
             let task = self.task_under_cursor();
-            let a = docker::exec_command(&task, "cat /etc/git-trainer/status")
+            let a = docker::exec_command(task, "cat /etc/git-trainer/status")
                 .await
                 .unwrap_or(CmdOutput {
                     output: "error".to_string(),
                     exit_code: -1,
                 })
                 .output;
-            if a == "1".to_string() {
+            if a == "1" {
                 let exit_command = Bytes::from("exit\n");
                 sender.send(exit_command)?;
 
@@ -217,7 +217,7 @@ impl App {
                     }
                 }
                 return Ok(PtyExitStatus::RestartTask);
-            } else if a == "2".to_string() {
+            } else if a == "2" {
                 let task = self.task_under_cursor();
                 // самый костыльный костыль. Миша, если ты это читаешь, пойми и прости меня.
                 let _ = docker::exec_command(task, "git-trainer task").await;
@@ -239,7 +239,7 @@ impl App {
             match event::read()? {
                 Event::Key(key) => {
                     if key.kind == KeyEventKind::Press {
-                        if let Some(_) = self.active_popup {
+                        if self.active_popup.is_some() {
                             let _ = self.handle_popup_key(key.code);
                         } else {
                             let _ = self.handle_terminal_key(key.code, key.modifiers, &sender);

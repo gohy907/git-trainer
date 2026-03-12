@@ -103,7 +103,7 @@ impl TableColors {
 }
 
 fn get_max_task_name_length(app: &App) -> usize {
-    let mut max = usize::min_value();
+    let mut max = usize::MIN;
     for task in app.repo.get_all_tasks().expect("While working with db:") {
         if task.name.chars().count() > max {
             max = task.name.chars().count();
@@ -115,7 +115,6 @@ fn get_max_task_name_length(app: &App) -> usize {
 impl App {
     pub fn render_main_menu(&mut self, frame: &mut Frame) {
         let title = Line::from(format!("git-trainer v{}", VERSION).bold()).centered();
-        // attempt_manager::ui::ui(frame, app);
 
         let global_layout = Layout::default()
             .direction(Direction::Vertical)
@@ -134,84 +133,74 @@ impl App {
         frame.render_widget(how_to_use, global_layout[2]);
         frame.render_widget(title, global_layout[0]);
 
-        render_table(frame, global_layout[1], self);
+        self.render_table(frame, global_layout[1]);
         if let Some(popup) = &self.active_popup {
-            popup.render(frame, self);
+            popup.render(frame);
         }
     }
-}
 
-fn render_table(frame: &mut Frame, rect: Rect, app: &mut App) {
-    let max_task_name_length = get_max_task_name_length(app) as u16;
-    let colors = TableColors::new();
+    fn render_table(&mut self, frame: &mut Frame, rect: Rect) {
+        let max_task_name_length = get_max_task_name_length(self) as u16;
+        let colors = TableColors::new();
 
-    let header = ["Название", "Описание", "Статус"]
-        .into_iter()
-        .map(Cell::from)
-        .collect::<Row>()
-        .height(1);
-    let binding = app
-        .repo
-        .get_tasks_user_local(app.context.user.as_ref().unwrap().id)
-        .expect("While working with db:");
-    let rows = binding.iter().enumerate().map(|(i, data)| {
-        let row_bg = match i % 2 {
-            0 => colors.normal_row_color,
-            _ => colors.alt_row_color,
-        };
+        let header = ["Название", "Описание", "Статус"]
+            .into_iter()
+            .map(Cell::from)
+            .collect::<Row>()
+            .height(1);
+        let binding = self
+            .repo
+            .get_tasks_user_local(self.context.user.as_ref().unwrap().id)
+            .expect("While working with db:");
+        let rows = binding.iter().enumerate().map(|(i, data)| {
+            let row_bg = if i % 2 == 0 {
+                colors.normal_row_color
+            } else {
+                colors.alt_row_color
+            };
 
-        let status_str = data.status.to_string();
+            let status_str = data.status.to_string();
 
-        let cell_height = 4;
+            let wrapped_desc = wrap(&data.description, LINE_WIDTH as usize, 4);
+            let item = [data.name.clone(), wrapped_desc, status_str.to_string()];
 
-        let wrapped_desc = wrap(&data.description, LINE_WIDTH as usize, cell_height);
-        let item = [
-            data.name.clone(),
-            wrapped_desc,
-            // "a\nb".to_string(),
-            status_str.to_string(),
-            // match data.grade {
-            //     Some(grade) => format!("{}/100", grade.to_string()),
-            //     None => "Нет оценки".to_string(),
-            // },
-        ];
+            let cells = item.into_iter().enumerate().map(|(col, content)| {
+                let mut cell =
+                    Cell::from(Text::from(content)).style(Style::new().fg(Color::White).bg(row_bg));
 
-        let cells = item.into_iter().enumerate().map(|(col, content)| {
-            let mut cell =
-                Cell::from(Text::from(content)).style(Style::new().fg(Color::White).bg(row_bg));
+                if col == 2 {
+                    let status_color = match data.status {
+                        TaskStatus::NotInProgress => Color::Red,
+                        TaskStatus::InProgress => Color::Yellow,
+                        TaskStatus::Done => Color::Blue,
+                        TaskStatus::Pending => Color::LightMagenta,
+                        TaskStatus::Approved => Color::LightGreen,
+                    };
 
-            if col == 2 {
-                let status_color = match data.status {
-                    TaskStatus::NotInProgress => Color::Red,
-                    TaskStatus::InProgress => Color::Yellow,
-                    TaskStatus::Done => Color::Blue,
-                    TaskStatus::Pending => Color::LightMagenta,
-                    TaskStatus::Approved => Color::LightGreen,
-                };
+                    cell = cell.style(Style::new().fg(status_color).bg(row_bg));
+                }
 
-                cell = cell.style(Style::new().fg(status_color).bg(row_bg));
-            }
+                cell
+            });
 
-            cell
+            Row::new(cells).height(4).style(Style::new().bg(row_bg))
         });
 
-        Row::new(cells).height(4).style(Style::new().bg(row_bg))
-    });
+        let selected_row_style = Style::default()
+            .add_modifier(Modifier::REVERSED)
+            .fg(colors.selected_row_style_fg);
 
-    let selected_row_style = Style::default()
-        .add_modifier(Modifier::REVERSED)
-        .fg(colors.selected_row_style_fg);
+        let t = Table::new(
+            rows,
+            [
+                Constraint::Length(max_task_name_length + 6),
+                Constraint::Min(LINE_WIDTH),
+                Constraint::Min(10),
+            ],
+        )
+        .header(header)
+        .row_highlight_style(selected_row_style);
 
-    let t = Table::new(
-        rows,
-        [
-            Constraint::Length(max_task_name_length + 6),
-            Constraint::Min(LINE_WIDTH),
-            Constraint::Min(10),
-        ],
-    )
-    .header(header)
-    .row_highlight_style(selected_row_style);
-
-    frame.render_stateful_widget(t, rect, &mut app.table_state);
+        frame.render_stateful_widget(t, rect, &mut self.table_state);
+    }
 }

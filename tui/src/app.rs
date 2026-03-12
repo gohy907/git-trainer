@@ -8,49 +8,8 @@ use ratatui::Frame;
 use ratatui::widgets::{ListState, ScrollbarState, TableState};
 use rusqlite::Error as SqlError;
 use std::fs;
-use thiserror::Error;
 
 pub const VERSION: &str = "0.1.0";
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("While working with config: {0}")]
-    ConfigError(#[from] ConfigIOError),
-
-    // TODO: Disambiguate
-    #[error("While working with Docker: {0}")]
-    DockerError(#[from] bollard::errors::Error),
-
-    #[error("While trying to run task: {0}")]
-    RunTaskError(#[from] docker::RunTaskError),
-}
-
-#[derive(Debug, Error)]
-pub enum ConfigIOError {
-    #[error("While saving config: {0}")]
-    Saving(#[from] SavingConfigError),
-
-    #[error("While  loading config : {0}")]
-    Loading(#[from] LoadingConfigError),
-}
-
-#[derive(Debug, Error)]
-pub enum SavingConfigError {
-    #[error("While serializing to TOML: {0}")]
-    SerializingError(#[from] toml::ser::Error),
-
-    #[error("IO error: {0}")]
-    IOError(#[from] io::Error),
-}
-
-#[derive(Debug, Error)]
-pub enum LoadingConfigError {
-    #[error("While reading from TOML: {0}")]
-    TomlError(#[from] toml::de::Error),
-
-    #[error("IO error: {0}")]
-    IOError(#[from] io::Error),
-}
 
 #[derive(PartialEq)]
 pub enum AppStatus {
@@ -72,7 +31,7 @@ impl AttemptsTableConfig {
         let mut attempts_table_state = TableState::default();
         attempts_table_state.select(Some(0));
         AttemptsTableConfig {
-            attempts_table_state: attempts_table_state,
+            attempts_table_state,
             attempts_scrollbar_state: ScrollbarState::default(),
             attempt_under_cursor: 0,
         }
@@ -90,7 +49,7 @@ impl TestsTableConfig {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
         TestsTableConfig {
-            list_state: list_state,
+            list_state,
             scrollbar_state: ScrollbarState::default(),
             test_under_cursor: 0,
         }
@@ -136,18 +95,6 @@ pub struct App {
     pub attempt_manager_config: AttemptManagerConfig,
 }
 
-#[cfg(debug_assertions)]
-const INFO_PATH: &str = "src/info.toml";
-
-#[cfg(not(debug_assertions))]
-const INFO_PATH: &str = "/etc/git-trainer/info.toml";
-
-#[cfg(debug_assertions)]
-const ATTEMPTS_REPO_PATH: &str = "src/attempts.toml";
-
-#[cfg(not(debug_assertions))]
-const ATTEMPTS_REPO_PATH: &str = "/etc/git-trainer/attempts.toml";
-
 impl App {
     pub fn new() -> App {
         let mut table_state = TableState::default();
@@ -164,10 +111,10 @@ impl App {
         App {
             context: Context {
                 tasks: repo.get_tasks_user_local(user.as_ref().unwrap().id),
-                user: user,
+                user,
             },
-            repo: repo,
-            table_state: table_state,
+            repo,
+            table_state,
             task_under_cursor: 0,
             status: AppStatus::Idling,
             active_popup: None,
@@ -201,27 +148,22 @@ impl App {
             self.handle_events()?;
             match self.status {
                 AppStatus::RestartingTask => {
-                    match docker::restart_task(&self.task_under_cursor()).await {
-                        Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
-
-                        _ => {}
+                    if let Err(err) = docker::restart_task(self.task_under_cursor()).await {
+                        self.active_popup = Some(Popup::Error(err.to_string()))
                     };
                     self.status = AppStatus::Idling;
                 }
                 AppStatus::RunningTask => {
                     let task: &mut Task = self.task_under_cursor_mut();
 
-                    match task.status {
-                        TaskStatus::NotInProgress => task.status = TaskStatus::InProgress,
-                        _ => {}
+                    if let TaskStatus::NotInProgress = task.status {
+                        task.status = TaskStatus::InProgress
                     }
                     match self.prepare_pty_bollard(terminal).await {
                         Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
                         Ok(PtyExitStatus::RestartTask) => {
-                            match docker::restart_task(&self.task_under_cursor()).await {
-                                Err(err) => self.active_popup = Some(Popup::Error(err.to_string())),
-
-                                _ => {}
+                            if let Err(err) = docker::restart_task(self.task_under_cursor()).await {
+                                self.active_popup = Some(Popup::Error(err.to_string()))
                             };
                         }
                         Ok(PtyExitStatus::Exit) => {
@@ -250,7 +192,7 @@ impl App {
 
     pub fn attempt_under_cursor(&self) -> Option<&Attempt> {
         let attempts = &self.attempts_of_choosed_task();
-        if attempts.len() == 0 {
+        if attempts.is_empty() {
             return None;
         }
         Some(
@@ -298,15 +240,11 @@ impl App {
                 let res = docker::exec_command(task, &cmd).await.unwrap();
                 if res.exit_code == 0 {
                     test_results.push(Test {
-                        id: 0,
-                        attempt_id: 0,
                         description: res.output,
                         result: TestResult::Passed,
                     });
                 } else {
                     test_results.push(Test {
-                        id: 0,
-                        attempt_id: 0,
                         description: res.output,
                         result: TestResult::Failed,
                     });
@@ -315,8 +253,6 @@ impl App {
             } else {
                 let res = format!("{}. Не выполнялся.", i);
                 test_results.push(Test {
-                    id: 0,
-                    attempt_id: 0,
                     description: res,
                     result: TestResult::NotExecuted,
                 });
@@ -334,8 +270,6 @@ impl App {
 
         let attempt = Attempt {
             id: 0,
-            task_id: task.id,
-            user_id: user_id,
             tests: Ok(test_results),
             timestamp: Ok("0".to_string()),
         };
