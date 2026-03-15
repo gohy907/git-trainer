@@ -39,9 +39,6 @@ ENV LANG=en_US.UTF-8 \
 RUN useradd --create-home --shell /bin/bash "$USERNAME"
 RUN usermod -aG sudo "$USERNAME" && \
     echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-RUN git config --global user.name "$GIT_USERNAME" && \
-    git config --global user.email "$GIT_EMAIL" && \
-    git config --global --add safe.directory /home/$USERNAME
 
 WORKDIR /home/$USERNAME
 
@@ -63,4 +60,7 @@ RUN sudo chown -R $USERNAME:$USERNAME counting-sort/
 RUN echo -n $DESCRIPTION > /etc/git-trainer/description
 USER $USERNAME
 RUN git config --global --add safe.directory /home/$USERNAME/counting-sort
+RUN git config --global user.name "$GIT_USERNAME" && \
+    git config --global user.email "$GIT_EMAIL" && \
+    git config --global --add safe.directory /home/$USERNAME
 RUN cd counting-sort && git switch main
