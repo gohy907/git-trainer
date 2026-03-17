@@ -26,6 +26,7 @@ RUN apt-get update && \
     locales \
     gcc \
     libc6-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
