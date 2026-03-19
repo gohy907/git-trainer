@@ -14,6 +14,7 @@ use vt100::Screen;
 
 use bytes::Bytes;
 use ratatui::DefaultTerminal;
+use std::time::Duration;
 use std::{
     io,
     sync::{Arc, RwLock, mpsc::Sender},
@@ -236,28 +237,30 @@ impl App {
 
             terminal.draw(|f| self.render_pty(f, parser.read().unwrap().screen()))?;
 
-            match event::read()? {
-                Event::Key(key) => {
-                    if key.kind == KeyEventKind::Press {
-                        if self.active_popup.is_some() {
-                            let _ = self.handle_popup_key(key.code);
-                        } else {
-                            let _ = self.handle_terminal_key(key.code, key.modifiers, &sender);
+            if event::poll(Duration::from_millis(50))? {
+                match event::read()? {
+                    Event::Key(key) => {
+                        if key.kind == KeyEventKind::Press {
+                            if self.active_popup.is_some() {
+                                let _ = self.handle_popup_key(key.code);
+                            } else {
+                                let _ = self.handle_terminal_key(key.code, key.modifiers, &sender);
+                            }
                         }
                     }
-                }
-                Event::Resize(cols, rows) => {
-                    let rows = rows - 4;
-                    let cols = cols - 2;
-                    parser.write().unwrap().screen_mut().set_size(rows, cols);
-                    let name = container_name.clone();
+                    Event::Resize(cols, rows) => {
+                        let rows = rows - 4;
+                        let cols = cols - 2;
+                        parser.write().unwrap().screen_mut().set_size(rows, cols);
+                        let name = container_name.clone();
 
-                    let handle = tokio::spawn(async move {
-                        let _ = resize_container(name, rows as i32, cols as i32).await;
-                    });
-                    handles.push(handle);
+                        let handle = tokio::spawn(async move {
+                            let _ = resize_container(name, rows as i32, cols as i32).await;
+                        });
+                        handles.push(handle);
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
     }
