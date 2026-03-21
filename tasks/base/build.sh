@@ -1,0 +1,1 @@
+docker build -f tasks/base/src/Dockerfile -t git-trainer:base-task-image .
