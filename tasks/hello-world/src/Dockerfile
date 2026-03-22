@@ -12,7 +12,7 @@ FROM git-trainer:base-task-image
 ARG USERNAME=student
 ARG GIT_USERNAME=student
 ARG GIT_EMAIL=student@alivetech.com
-ENV DESCRIPTION="Давайте начнём с чего-нибудь лёгкого.\nСоздайте в папке \"hello-world\" новый Git репозиторий, в котором напишите код на C, выводящий на экран строчку \"Hello, World!\".\nПосле этого сделайте ровно один коммит, добавляющий этот код, с названием \"Initial commit\"."
+ENV DESCRIPTION="Давайте начнём с чего-нибудь лёгкого.\nСоздайте в папке \"hello-world\" новый Git репозиторий, в котором напишите main.cpp, выводящий на экран строчку \"Hello, World!\".\nПосле этого сделайте ровно один коммит, добавляющий этот файл, с названием \"Initial commit\"."
 
 # Настройки ниже трогать уже не стоит
 

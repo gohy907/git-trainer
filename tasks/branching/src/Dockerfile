@@ -3,7 +3,7 @@ FROM git-trainer:base-task-image
 ARG USERNAME=student
 ARG GIT_USERNAME=student
 ARG GIT_EMAIL=student@alivetech.com
-ENV DESCRIPTION="В этом репозитории вы с другом пишете алгоритм сортировки подсчётом.\nВаш друг сделал отдельную ветку, где имплементировал алгоритм, а вам досталась задача написать функцию вывода вектора на экран в другой ветке.\nНапишите эту функцию в ветке \"print_vector\" и объедините обе ваших ветки с главной."
+ENV DESCRIPTION="В этом репозитории вы с другом пишете алгоритм сортировки подсчётом.\nВаш друг сделал отдельную ветку, где имплементировал алгоритм, а вам досталась задача написать функцию вывода вектора на экран в другой ветке.\nНапишите эту функцию в ветке \"print_vector\" и объедините обе ваших ветки с главной веткой main."
 
 COPY tasks/branching/src/repo counting-sort
 RUN sudo chown -R $USERNAME:$USERNAME counting-sort/
