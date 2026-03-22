@@ -50,6 +50,7 @@ struct AttemptEntity {
     user_id: i64,
     task_id: i64,
     timestamp: String,
+    bash_history: String,
 }
 
 pub fn format_timestamp(timestamp_str: &str) -> Result<String, ParseError> {
@@ -64,6 +65,19 @@ pub struct Attempt {
     pub id: i64,
     pub timestamp: Result<String, ParseError>,
     pub tests: Result<Vec<Test>>,
+    pub bash_history: String,
+}
+
+pub struct AttemptCreate {
+    pub user_id: i64,
+    pub task_id: i64,
+    pub tests: Vec<TestCreate>,
+    pub bash_history: String,
+}
+
+pub struct TestCreate {
+    pub description: String,
+    pub result: i64,
 }
 
 pub struct NewAttemptEntity {
@@ -76,6 +90,7 @@ impl From<AttemptEntity> for Attempt {
             id: attempt_entity.id,
             timestamp: format_timestamp(&attempt_entity.timestamp),
             tests: Repo::get_attempt_tests(&Repo::init_database(), attempt_entity.id),
+            bash_history: attempt_entity.bash_history,
         }
     }
 }
@@ -214,18 +229,24 @@ impl Repo {
     pub fn get_task_attempts_user_local(&self, user_id: i64, task_id: i64) -> Result<Vec<Attempt>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, timestamp
+            "SELECT id, user_id, task_id, timestamp, bash_history
          FROM attempts WHERE user_id = ?1 AND task_id = ?2
          ORDER BY timestamp DESC",
         )?;
 
         let attempt_rows = stmt.query_map([user_id, task_id], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
         })?;
 
         let mut attempts = Vec::new();
         for attempt_row in attempt_rows {
-            let (id, user_id, task_id, timestamp) = attempt_row?;
+            let (id, user_id, task_id, timestamp, bash_history) = attempt_row?;
 
             attempts.push(
                 AttemptEntity {
@@ -233,6 +254,7 @@ impl Repo {
                     user_id,
                     task_id,
                     timestamp,
+                    bash_history,
                 }
                 .into(),
             );
@@ -425,30 +447,20 @@ impl Repo {
         conn.query_row(
             "SELECT id, username, created_at FROM users WHERE username = ?1",
             [username],
-            |row| {
-                Ok(UserEntity {
-                    id: row.get(0)?,
-                }
-                .into())
-            },
+            |row| Ok(UserEntity { id: row.get(0)? }.into()),
         )
     }
 
-    pub fn create_attempt(
-        &mut self,
-        user_id: i64,
-        task_id: i64,
-        attempt: NewAttemptEntity,
-    ) -> Result<i64> {
+    pub fn create_attempt(&mut self, attempt: AttemptCreate) -> Result<i64> {
         let conn = &mut self.connection;
         let tx = conn.transaction()?;
 
         let now = Utc::now().to_rfc3339();
 
         tx.execute(
-            "INSERT INTO attempts (user_id, task_id, timestamp)
-         VALUES (?1, ?2, ?3)",
-            params![user_id, task_id, now],
+            "INSERT INTO attempts (user_id, task_id, timestamp, bash_history)
+         VALUES (?1, ?2, ?3, ?4)",
+            params![attempt.user_id, attempt.task_id, now, attempt.bash_history],
         )?;
 
         let attempt_id = tx.last_insert_rowid();
@@ -468,7 +480,7 @@ impl Repo {
     pub fn get_attempt_by_id(&self, attempt_id: i64) -> Result<Attempt> {
         let conn = &self.connection;
         conn.query_row(
-            "SELECT id, user_id, task_id, timestamp
+            "SELECT id, user_id, task_id, timestamp, bash_history
         FROM attempts WHERE id = ?1",
             [attempt_id],
             |row| {
@@ -477,6 +489,7 @@ impl Repo {
                     user_id: row.get(1)?,
                     task_id: row.get(2)?,
                     timestamp: row.get(3)?,
+                    bash_history: row.get(4)?,
                 }
                 .into())
             },
@@ -486,18 +499,24 @@ impl Repo {
     pub fn get_user_attempts(&self, user_id: i64) -> Result<Vec<Attempt>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, timestamp
+            "SELECT id, user_id, task_id, timestamp, bash_history
          FROM attempts WHERE user_id = ?1
          ORDER BY timestamp DESC",
         )?;
 
         let attempt_rows = stmt.query_map([user_id], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
         })?;
 
         let mut attempts = Vec::new();
         for attempt_row in attempt_rows {
-            let (id, user_id, task_id, timestamp) = attempt_row?;
+            let (id, user_id, task_id, timestamp, bash_history) = attempt_row?;
 
             attempts.push(
                 AttemptEntity {
@@ -505,6 +524,7 @@ impl Repo {
                     user_id,
                     task_id,
                     timestamp,
+                    bash_history,
                 }
                 .into(),
             );
@@ -516,18 +536,24 @@ impl Repo {
     pub fn get_task_attempts(&self, task_id: i64) -> Result<Vec<Attempt>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, timestamp
+            "SELECT id, user_id, task_id, timestamp, bash_history
          FROM attempts WHERE task_id = ?1
          ORDER BY timestamp DESC",
         )?;
 
         let attempt_rows = stmt.query_map([task_id], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
         })?;
 
         let mut attempts = Vec::new();
         for attempt_row in attempt_rows {
-            let (id, user_id, task_id, timestamp) = attempt_row?;
+            let (id, user_id, task_id, timestamp, bash_history) = attempt_row?;
 
             attempts.push(
                 AttemptEntity {
@@ -535,6 +561,7 @@ impl Repo {
                     user_id,
                     task_id,
                     timestamp,
+                    bash_history,
                 }
                 .into(),
             );

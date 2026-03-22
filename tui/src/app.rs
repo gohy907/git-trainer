@@ -1,4 +1,6 @@
-use crate::db::{Attempt, Repo, Task, TaskStatus, Test, TestResult, User};
+use crate::db::{
+    Attempt, AttemptCreate, Repo, Task, TaskStatus, Test, TestCreate, TestResult, User,
+};
 use crate::docker;
 use crate::io;
 use crate::popup::Popup;
@@ -239,22 +241,22 @@ impl App {
                 let cmd = format!("/etc/git-trainer/tests/test{}.sh", i);
                 let res = docker::exec_command(task, &cmd).await.unwrap();
                 if res.exit_code == 0 {
-                    test_results.push(Test {
+                    test_results.push(TestCreate {
                         description: res.output,
-                        result: TestResult::Passed,
+                        result: 0,
                     });
                 } else {
-                    test_results.push(Test {
+                    test_results.push(TestCreate {
                         description: res.output,
-                        result: TestResult::Failed,
+                        result: 1,
                     });
                     failed = true;
                 }
             } else {
                 let res = format!("{}. Не выполнялся.", i);
-                test_results.push(Test {
+                test_results.push(TestCreate {
                     description: res,
-                    result: TestResult::NotExecuted,
+                    result: 2,
                 });
             }
         }
@@ -268,14 +270,20 @@ impl App {
             .expect("While working with db:")
             .id;
 
-        let attempt = Attempt {
-            id: 0,
-            tests: Ok(test_results),
-            timestamp: Ok("0".to_string()),
+        let bash_history = docker::exec_command(task, "cat /home/student/.bash_history")
+            .await
+            .unwrap()
+            .output;
+
+        let attempt = AttemptCreate {
+            tests: test_results,
+            task_id: task.id,
+            user_id: user_id,
+            bash_history: bash_history.clone(),
         };
 
         self.repo
-            .create_attempt(user_id, task.id, attempt.into())
+            .create_attempt(attempt)
             .expect("While working with db:");
     }
 

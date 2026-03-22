@@ -1,0 +1,1 @@
+ALTER TABLE attempts ADD COLUMN bash_history TEXT NOT NULL DEFAULT '';
