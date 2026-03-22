@@ -47,6 +47,9 @@ RUN usermod -aG sudo "$USERNAME" && \
 
 WORKDIR /home/$USERNAME
 
+RUN echo 'export PROMPT_COMMAND="history -a; history -n"' >> /home/$USERNAME/.bashrc
+RUN echo 'export HISTCONTROL=""' >> /home/$USERNAME/.bashrc
+
 RUN mkdir -p /etc/git-trainer
 RUN mkdir -p /etc/git-trainer/tests
 RUN echo -n 0 > /etc/git-trainer/status
