@@ -1,0 +1,2 @@
+default: 
+    docker build -f tasks/hello-world/src/Dockerfile -t git-trainer:hello-world .
