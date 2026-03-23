@@ -5,7 +5,7 @@ run:
 # Собрать образы заданий
 build-images:
     just --justfile tasks/base/justfile --working-directory=.
-    find -mindepth 2 -name "justfile" -exec just --justfile {} --working-directory=. default \;
+    find . -mindepth 2 -name "justfile" -exec just --justfile {} --working-directory=. default \;
 
 # Собрать git-trainer для релиза
 release:

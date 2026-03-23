@@ -21,3 +21,5 @@ target
 #.idea/
 
 db.sqlite
+
+.DS_Store
