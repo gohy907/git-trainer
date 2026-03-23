@@ -1,0 +1,2 @@
+git clone git@github.com:git-trainer-tasks/forget-about-that-1 tasks/forget-about-that-1/src/repo
+docker build -f tasks/forget-about-that-1/src/Dockerfile -t git-trainer:forget-about-that-1 .
