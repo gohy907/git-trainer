@@ -1,0 +1,48 @@
+default:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    rm -rf tasks/just-push-it/src/repo
+    rm -rf tasks/just-push-it/src/just-push-it-origin.git
+
+    TMP_BASE_REPO="$(mktemp -d /tmp/git-trainer_just-push-it-base.XXXXXX)"
+    TMP_REMOTE_WORK="$(mktemp -d /tmp/git-trainer_just-push-it-remote.XXXXXX)"
+    trap 'rm -rf "$TMP_BASE_REPO" "$TMP_REMOTE_WORK"' EXIT
+
+    git clone git@github.com:git-trainer-tasks/just-push-it "$TMP_BASE_REPO"
+    git clone --bare "$TMP_BASE_REPO" tasks/just-push-it/src/just-push-it-origin.git
+    git clone tasks/just-push-it/src/just-push-it-origin.git tasks/just-push-it/src/repo
+    git clone tasks/just-push-it/src/just-push-it-origin.git "$TMP_REMOTE_WORK"
+
+    cat > "$TMP_REMOTE_WORK/README.md" <<'EOF'
+    # Просто запушь это
+
+    Этот репозиторий содержит небольшую консольную программу на C++.
+
+    Ваша задача - реализовать функцию `max_of_two` в файле `main.cpp`, сделать коммит и отправить изменения в удалённый репозиторий.
+
+    ## Сборка
+
+    ```sh
+    g++ -std=c++17 -Wall -Wextra -pedantic main.cpp -o just-push-it
+    ```
+
+    ## Запуск
+
+    ```sh
+    ./just-push-it
+    ```
+    EOF
+
+    (
+        cd "$TMP_REMOTE_WORK"
+        git config user.name "Razrushitell2005"
+        git config user.email "razrushitell2005@aboba.org"
+        git add README.md
+        GIT_AUTHOR_DATE="2026-03-24T12:00:00+04:00" \
+        GIT_COMMITTER_DATE="2026-03-24T12:00:00+04:00" \
+        git commit -m "docs: перевести README на русский язык"
+        git push origin main
+    )
+
+    docker build -f tasks/just-push-it/src/Dockerfile -t git-trainer:just-push-it .
