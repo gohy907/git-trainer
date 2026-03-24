@@ -1,23 +1,15 @@
 #!/bin/bash
 
 REPO_DIR="$HOME/just-push-it"
-TMP_DIR="$(mktemp -d /tmp/git-trainer.XXXXXX)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+REMOTE_GIT_DIR="/opt/git-trainer/just-push-it-origin.git"
 
-if ! cp -R "$REPO_DIR" "$TMP_DIR/repo" 2>/dev/null; then
-    echo "5. Не удалось подготовить временную копию репозитория для проверки."
-    exit 1
-fi
+LOCAL_HEAD="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null)"
+REMOTE_HEAD="$(git --git-dir="$REMOTE_GIT_DIR" rev-parse main 2>/dev/null)"
 
-cd "$TMP_DIR/repo" || exit 1
-git reset --hard HEAD &>/dev/null
-git clean -fdx &>/dev/null
-
-if grep -qxF '# Просто запушь это' README.md >/dev/null 2>&1 && \
-   grep -qxF 'Этот репозиторий содержит небольшую консольную программу на C++.' README.md >/dev/null 2>&1; then
-    echo "5. README.md содержит перевод из удалённого репозитория."
+if [ -n "$LOCAL_HEAD" ] && [ "$LOCAL_HEAD" = "$REMOTE_HEAD" ]; then
+    echo "5. Последний локальный коммит отправлен в origin."
     exit 0
 else
-    echo "5. Убедитесь, что вы забрали удалённый коммит с переводом README.md."
+    echo "5. Убедитесь, что вы запушили итоговый коммит в origin/main."
     exit 1
 fi
