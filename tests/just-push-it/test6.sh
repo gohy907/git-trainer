@@ -1,7 +1,7 @@
 #!/bin/bash
 
 REPO_DIR="$HOME/just-push-it"
-REMOTE_GIT_DIR="$HOME/just-push-it-origin.git"
+REMOTE_GIT_DIR="/opt/git-trainer/just-push-it-origin.git"
 
 LOCAL_HEAD="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null)"
 REMOTE_HEAD="$(git --git-dir="$REMOTE_GIT_DIR" rev-parse main 2>/dev/null)"

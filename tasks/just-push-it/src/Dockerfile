@@ -6,8 +6,9 @@ ARG GIT_EMAIL=student@alivetech.com
 ENV DESCRIPTION="Вам нужно реализовать функцию max_of_two в файле main.cpp, сделать один коммит с вашим изменением и запушить его в origin. Всё! Действуйте :)"
 
 COPY tasks/just-push-it/src/repo just-push-it
-COPY tasks/just-push-it/src/just-push-it-origin.git just-push-it-origin.git
-RUN sudo chown -R $USERNAME:$USERNAME just-push-it just-push-it-origin.git
+COPY tasks/just-push-it/src/just-push-it-origin.git /opt/git-trainer/just-push-it-origin.git
+RUN sudo chown -R $USERNAME:$USERNAME just-push-it && \
+    sudo chown -R $USERNAME:$USERNAME /opt/git-trainer/just-push-it-origin.git
 
 # Настройки ниже трогать уже не стоит
 
@@ -18,5 +19,6 @@ RUN git config --global user.name "$GIT_USERNAME" && \
     git config --global user.email "$GIT_EMAIL" && \
     git config --global --add safe.directory /home/$USERNAME
 RUN cd just-push-it && \
-    git remote set-url origin /home/$USERNAME/just-push-it-origin.git && \
+    git config --global --add safe.directory /opt/git-trainer/just-push-it-origin.git && \
+    git remote set-url origin /opt/git-trainer/just-push-it-origin.git && \
     git switch main
