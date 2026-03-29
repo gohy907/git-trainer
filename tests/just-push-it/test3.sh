@@ -13,7 +13,7 @@ cd "$TMP_DIR/repo" || exit 1
 git reset --hard HEAD &>/dev/null
 git clean -fdx &>/dev/null
 
-if g++ -std=c++17 -Wall -Wextra -pedantic main.cpp -o just-push-it &>/dev/null; then
+if g++ main.cpp -o just-push-it &>/dev/null; then
     echo "3. Программа компилируется."
     exit 0
 else
