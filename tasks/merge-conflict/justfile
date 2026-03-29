@@ -1,3 +1,3 @@
 default:
-    -git clone git@github.com:git-trainer-tasks/merge-conflict tasks/merge-conflict/src/repo 
+    -git clone https://github.com/git-trainer-tasks/merge-conflict.git tasks/merge-conflict/src/repo 
     docker build -f tasks/merge-conflict/src/Dockerfile -t git-trainer:merge-conflict .
