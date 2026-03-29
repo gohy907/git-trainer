@@ -35,10 +35,17 @@ impl Popup {
                 lines: vec![
                     Line::from("Начать выполнение задания?").fg(Color::LightBlue),
                     Line::from("Enter — подтвердить, Esc — отменить").fg(Color::LightBlue),
+                    Line::from(""),
+                    Line::from(
+                        "Внутри вы можете посмотреть условие задания командой git-trainer task",
+                    )
+                    .fg(Color::LightBlue),
+                    Line::from("А сдать задание можно с помощью git-trainer submit")
+                        .fg(Color::LightBlue),
                 ],
                 color: Color::LightBlue,
-                width: frame.area().width / 3,
-                height: frame.area().height / 3,
+                width: std::cmp::max(frame.area().width / 3, 69),
+                height: std::cmp::max(frame.area().height / 3, 7),
             },
 
             Popup::ResetConfirmation => PopupConfig {
@@ -49,8 +56,8 @@ impl Popup {
                     Line::from("Enter — подтвердить, Esc — отменить").fg(Color::LightBlue),
                 ],
                 color: Color::LightBlue,
-                width: frame.area().width / 3,
-                height: frame.area().height / 3,
+                width: std::cmp::max(frame.area().width / 3, 35),
+                height: std::cmp::max(frame.area().height / 3, 6),
             },
 
             Popup::Error(error) => PopupConfig {
