@@ -12,4 +12,4 @@ release: build-images
     cargo build -p tui --release
     sudo mkdir -p /var/lib/git-trainer
     sudo cp -r tests migrations schema.sql /var/lib/git-trainer/
-    sudo cp target/release/tui /var/lib/git-trainer/git-trainer
+    sudo cp target/release/tui /usr/bin/git-trainer
