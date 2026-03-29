@@ -1,7 +1,7 @@
 use crate::Frame;
 use crate::app::{App, VERSION};
 use crate::docker::resize_container;
-use crate::docker::{self, ensure_task_container_running};
+use crate::docker::{self, ensure_task_container_created};
 use crossterm::event;
 use crossterm::event::{Event, KeyEventKind};
 use futures_util::FutureExt;
@@ -110,24 +110,16 @@ impl App {
             cols: terminal.size()?.width - 2,
         };
 
-        ensure_task_container_running(task).await?;
+        ensure_task_container_created(task).await?;
         let container_name = task.container_name.clone();
-        docker::resize_container(container_name.clone(), size.rows as i32, size.cols as i32)
-            .await?;
         let res = docker::attach_container(task).await?;
 
         let mut output_stream = res.output;
         let mut input = res.input;
+        docker::start_container(task).await?;
 
-        {
-            let rows = size.rows as i32;
-            let cols = size.cols as i32;
-            let container_name = task.container_name.clone();
-            let handle = tokio::spawn(async move {
-                let _ = resize_container(container_name, rows, cols).await;
-            });
-            handles.push(handle);
-        }
+        docker::resize_container(container_name.clone(), size.rows as i32, size.cols as i32)
+            .await?;
 
         let parser = Arc::new(RwLock::new(vt100::Parser::new(size.rows, size.cols, 0)));
 
@@ -180,24 +172,9 @@ impl App {
             }
         });
         handles.push(writer_handle);
-
-        // 3. Теперь запускаем основной цикл PTY
-        // Передаем наш асинхронный 'tx'
         let exit_status = self
             .run_pty_bollard(terminal, parser, tx, exit_rx, container_name)
             .await?;
-
-        // let handle = tokio::spawn(async move {
-        //     while let Ok(bytes) = rx.recv() {
-        //         if input.write_all(&bytes).await.is_err() {
-        //             break;
-        //         }
-        //         if input.flush().await.is_err() {
-        //             break;
-        //         }
-        //     }
-        // });
-        // handles.push(handle);
 
         for handle in handles {
             handle.await.map_err(PreparePtyError::JoinError)?;
