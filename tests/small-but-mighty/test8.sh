@@ -23,7 +23,6 @@ if [ "$EXIT_CODE" = "1" ] && [ "$OUTPUT" = "$EXPECTED_OUTPUT" ]; then
     echo "8. Срочный фикс в main корректно обрабатывает запуск без аргументов."
     exit 0
 else
-    echo "$EXIT_CODE $OUTPUT"
     echo "8. Убедитесь, что в main программа без аргументов печатает \"Usage: python3 app.py <drink>\" и завершается с кодом 1."
     exit 1
 fi
