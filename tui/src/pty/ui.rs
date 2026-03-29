@@ -4,11 +4,13 @@ use crate::docker::{self, ensure_task_container_running};
 use crate::docker::{CmdOutput, resize_container};
 use crossterm::event;
 use crossterm::event::{Event, KeyEventKind};
+use futures_util::FutureExt;
 use ratatui::layout::{Alignment, Constraint};
 use ratatui::prelude::{Direction, Layout};
 use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Paragraph};
+use tokio::sync::mpsc::error::SendError;
 use tui_term::{vt100, widget::PseudoTerminal};
 use vt100::Screen;
 
@@ -55,7 +57,7 @@ pub enum RunPtyError {
     DrawTerminalError(#[from] io::Error),
 
     #[error("While sending to PTY: {0}")]
-    MPSCError(#[from] std::sync::mpsc::SendError<bytes::Bytes>),
+    MPSCError(#[from] tokio::sync::mpsc::error::SendError<bytes::Bytes>),
 
     #[error("Task join error: {0}")]
     JoinError(#[from] tokio::task::JoinError),
@@ -130,7 +132,7 @@ impl App {
 
         let parser = Arc::new(RwLock::new(vt100::Parser::new(size.rows, size.cols, 0)));
 
-        let (tx, rx) = std::sync::mpsc::channel::<Bytes>();
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<Bytes>(1024);
         let (exit_tx, exit_rx) = std::sync::mpsc::channel::<()>();
 
         {
@@ -168,8 +170,8 @@ impl App {
         }
 
         // Writer таск
-        let handle = tokio::spawn(async move {
-            while let Ok(bytes) = rx.recv() {
+        let writer_handle = tokio::spawn(async move {
+            while let Some(bytes) = rx.recv().await {
                 if input.write_all(&bytes).await.is_err() {
                     break;
                 }
@@ -178,11 +180,25 @@ impl App {
                 }
             }
         });
-        handles.push(handle);
+        handles.push(writer_handle);
 
+        // 3. Теперь запускаем основной цикл PTY
+        // Передаем наш асинхронный 'tx'
         let exit_status = self
             .run_pty_bollard(terminal, parser, tx, exit_rx, container_name)
             .await?;
+
+        // let handle = tokio::spawn(async move {
+        //     while let Ok(bytes) = rx.recv() {
+        //         if input.write_all(&bytes).await.is_err() {
+        //             break;
+        //         }
+        //         if input.flush().await.is_err() {
+        //             break;
+        //         }
+        //     }
+        // });
+        // handles.push(handle);
 
         for handle in handles {
             handle.await.map_err(PreparePtyError::JoinError)?;
@@ -194,37 +210,37 @@ impl App {
         &mut self,
         terminal: &mut DefaultTerminal,
         parser: Arc<RwLock<vt100::Parser>>,
-        sender: Sender<Bytes>,
+        sender: tokio::sync::mpsc::Sender<Bytes>,
         exit_rx: std::sync::mpsc::Receiver<()>,
         container_name: String,
     ) -> Result<PtyExitStatus, RunPtyError> {
         let mut handles = Vec::new();
+        let mut status_time = tokio::time::interval(Duration::from_millis(500));
         loop {
-            let task = self.task_under_cursor();
-            let a = docker::exec_command(task, "cat /etc/git-trainer/status")
-                .await
-                .unwrap_or(CmdOutput {
-                    output: "error".to_string(),
-                    exit_code: -1,
-                })
-                .output;
-            if a == "1" {
-                let exit_command = Bytes::from("exit\n");
-                sender.send(exit_command)?;
+            if status_time.tick().now_or_never().is_some() {
+                let task = self.task_under_cursor();
+                let status_output = docker::exec_command(task, "cat /etc/git-trainer/status").await;
+                if let Ok(cmd) = status_output {
+                    let a = cmd.output.trim();
+                    if a == "1" {
+                        let exit_command = Bytes::from("exit\n");
+                        sender.send(exit_command).await;
 
-                for handle in handles.drain(..) {
-                    if let Err(e) = handle.await {
-                        return Err(RunPtyError::JoinError(e));
+                        for handle in handles.drain(..) {
+                            if let Err(e) = handle.await {
+                                return Err(RunPtyError::JoinError(e));
+                            }
+                        }
+                        return Ok(PtyExitStatus::RestartTask);
+                    } else if a == "2" {
+                        let task = self.task_under_cursor();
+                        // самый костыльный костыль. Миша, если ты это читаешь, пойми и прости меня.
+                        let _ = docker::exec_command(task, "git-trainer task").await;
+
+                        self.test_submitted_task().await;
+                        self.update_context();
                     }
                 }
-                return Ok(PtyExitStatus::RestartTask);
-            } else if a == "2" {
-                let task = self.task_under_cursor();
-                // самый костыльный костыль. Миша, если ты это читаешь, пойми и прости меня.
-                let _ = docker::exec_command(task, "git-trainer task").await;
-
-                self.test_submitted_task().await;
-                self.update_context();
             }
             if exit_rx.try_recv().is_ok() {
                 for handle in handles.drain(..) {
@@ -237,7 +253,7 @@ impl App {
 
             terminal.draw(|f| self.render_pty(f, parser.read().unwrap().screen()))?;
 
-            if event::poll(Duration::from_millis(50))? {
+            if event::poll(Duration::from_millis(10))? {
                 match event::read()? {
                     Event::Key(key) => {
                         if key.kind == KeyEventKind::Press {
