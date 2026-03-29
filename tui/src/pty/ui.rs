@@ -1,7 +1,7 @@
 use crate::Frame;
 use crate::app::{App, VERSION};
+use crate::docker::resize_container;
 use crate::docker::{self, ensure_task_container_running};
-use crate::docker::{CmdOutput, resize_container};
 use crossterm::event;
 use crossterm::event::{Event, KeyEventKind};
 use futures_util::FutureExt;
@@ -10,7 +10,6 @@ use ratatui::prelude::{Direction, Layout};
 use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Paragraph};
-use tokio::sync::mpsc::error::SendError;
 use tui_term::{vt100, widget::PseudoTerminal};
 use vt100::Screen;
 
@@ -19,7 +18,7 @@ use ratatui::DefaultTerminal;
 use std::time::Duration;
 use std::{
     io,
-    sync::{Arc, RwLock, mpsc::Sender},
+    sync::{Arc, RwLock},
 };
 
 use bollard::container::LogOutput;
@@ -224,7 +223,7 @@ impl App {
                     let a = cmd.output.trim();
                     if a == "1" {
                         let exit_command = Bytes::from("exit\n");
-                        sender.send(exit_command).await;
+                        _ = sender.send(exit_command).await;
 
                         for handle in handles.drain(..) {
                             if let Err(e) = handle.await {

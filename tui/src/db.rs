@@ -351,30 +351,6 @@ impl Repo {
         Ok(task_models)
     }
 
-    // let mut stmt = conn.prepare(
-    //     "SELECT id, user_id, task_id, timestamp
-    //  FROM attempts WHERE user_id = ?1
-    //  ORDER BY timestamp DESC",
-    // )?;
-    // let attempt_rows = stmt.query_map([user_id], |row| {
-    //     Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
-    // })?;
-    //
-    // let mut attempts = Vec::new();
-    // for attempt_row in attempt_rows {
-    //     let (id, user_id, task_id, timestamp) = attempt_row?;
-    //
-    //     attempts.push(
-    //         AttemptEntity {
-    //             id: id,
-    //             user_id,
-    //             task_id,
-    //             timestamp,
-    //         }
-    //         .into(),
-    //     );
-    // }
-
     pub fn load_new_tasks(&self, user_id: i64, loaded_tasks: &Vec<Task>) -> Result<()> {
         let conn = &self.connection;
         let task_models = self.get_all_tasks()?;
@@ -477,111 +453,6 @@ impl Repo {
         Ok(attempt_id)
     }
 
-    pub fn get_attempt_by_id(&self, attempt_id: i64) -> Result<Attempt> {
-        let conn = &self.connection;
-        conn.query_row(
-            "SELECT id, user_id, task_id, timestamp, bash_history
-        FROM attempts WHERE id = ?1",
-            [attempt_id],
-            |row| {
-                Ok(AttemptEntity {
-                    id: row.get(0)?,
-                    user_id: row.get(1)?,
-                    task_id: row.get(2)?,
-                    timestamp: row.get(3)?,
-                    bash_history: row.get(4)?,
-                }
-                .into())
-            },
-        )
-    }
-
-    pub fn get_user_attempts(&self, user_id: i64) -> Result<Vec<Attempt>> {
-        let conn = &self.connection;
-        let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, timestamp, bash_history
-         FROM attempts WHERE user_id = ?1
-         ORDER BY timestamp DESC",
-        )?;
-
-        let attempt_rows = stmt.query_map([user_id], |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                row.get(3)?,
-                row.get(4)?,
-            ))
-        })?;
-
-        let mut attempts = Vec::new();
-        for attempt_row in attempt_rows {
-            let (id, user_id, task_id, timestamp, bash_history) = attempt_row?;
-
-            attempts.push(
-                AttemptEntity {
-                    id,
-                    user_id,
-                    task_id,
-                    timestamp,
-                    bash_history,
-                }
-                .into(),
-            );
-        }
-
-        Ok(attempts)
-    }
-
-    pub fn get_task_attempts(&self, task_id: i64) -> Result<Vec<Attempt>> {
-        let conn = &self.connection;
-        let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, timestamp, bash_history
-         FROM attempts WHERE task_id = ?1
-         ORDER BY timestamp DESC",
-        )?;
-
-        let attempt_rows = stmt.query_map([task_id], |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                row.get(3)?,
-                row.get(4)?,
-            ))
-        })?;
-
-        let mut attempts = Vec::new();
-        for attempt_row in attempt_rows {
-            let (id, user_id, task_id, timestamp, bash_history) = attempt_row?;
-
-            attempts.push(
-                AttemptEntity {
-                    id,
-                    user_id,
-                    task_id,
-                    timestamp,
-                    bash_history,
-                }
-                .into(),
-            );
-        }
-
-        Ok(attempts)
-    }
-
-    pub fn delete_attempt(&self, attempt_id: i64) -> Result<()> {
-        let conn = &self.connection;
-        conn.execute("DELETE FROM attempts WHERE id = ?1", [attempt_id])?;
-        Ok(())
-    }
-
-    pub fn delete_user_attempts(&self, user_id: i64) -> Result<()> {
-        let conn = &self.connection;
-        conn.execute("DELETE FROM attempts WHERE user_id = ?1", [user_id])?;
-        Ok(())
-    }
-
     pub fn get_attempt_tests(&self, attempt_id: i64) -> Result<Vec<Test>> {
         let conn = &self.connection;
         let mut stmt = conn.prepare(
@@ -599,42 +470,6 @@ impl Repo {
         })?;
 
         tests.collect()
-    }
-
-    pub fn get_test_by_id(&self, test_id: i64) -> Result<Test> {
-        let conn = &self.connection;
-        conn.query_row(
-            "SELECT id, attempt_id, description, result
-         FROM attempt_tests WHERE id = ?1",
-            [test_id],
-            |row| {
-                Ok(TestEntity {
-                    description: row.get(2)?,
-                    result: row.get(3)?,
-                }
-                .into())
-            },
-        )
-    }
-
-    pub fn get_last_attempt(&self, user_id: i64, task_id: i64) -> Result<Attempt> {
-        let conn = &self.connection;
-        let attempt_id: i64 = conn.query_row(
-            "SELECT id FROM attempts
-         WHERE user_id = ?1 AND task_id = ?2
-         ORDER BY timestamp DESC LIMIT 1",
-            params![user_id, task_id],
-            |row| row.get(0),
-        )?;
-
-        self.get_attempt_by_id(attempt_id)
-    }
-
-    pub fn get_task_id_by_name(&self, name: String) -> Result<i64> {
-        let conn = &self.connection;
-        conn.query_row("SELECT id FROM tasks WHERE name = ?1", [name], |row| {
-            row.get(0)
-        })
     }
 
     pub fn update_task_status(&self, task_id: i64, user_id: i64, status: TaskStatus) -> Result<()> {
