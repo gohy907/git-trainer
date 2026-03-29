@@ -13,7 +13,4 @@ RUN sudo chown -R $USERNAME:$USERNAME binary-addition
 RUN echo -n $DESCRIPTION > /etc/git-trainer/description
 USER $USERNAME
 RUN git config --global --add safe.directory /home/$USERNAME/binary-addition
-RUN git config --global user.name "$GIT_USERNAME" && \
-    git config --global user.email "$GIT_EMAIL" && \
-    git config --global --add safe.directory /home/$USERNAME
 RUN cd binary-addition && git switch main

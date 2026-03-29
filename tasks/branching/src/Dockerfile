@@ -13,7 +13,4 @@ RUN sudo chown -R $USERNAME:$USERNAME counting-sort/
 RUN echo -n $DESCRIPTION > /etc/git-trainer/description
 USER $USERNAME
 RUN git config --global --add safe.directory /home/$USERNAME/counting-sort
-RUN git config --global user.name "$GIT_USERNAME" && \
-    git config --global user.email "$GIT_EMAIL" && \
-    git config --global --add safe.directory /home/$USERNAME
 RUN cd counting-sort && git switch main
