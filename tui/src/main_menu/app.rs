@@ -20,8 +20,8 @@ impl App {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
-            KeyCode::Up => self.previous_row(),
-            KeyCode::Down => self.next_row(),
+            KeyCode::Up | KeyCode::Char('k') => self.previous_row(),
+            KeyCode::Down | KeyCode::Char('j') => self.next_row(),
             KeyCode::Char(' ') => self.status = AppStatus::ShowingAttempts,
             KeyCode::Enter => {
                 if let Some(popup) = self.active_popup.take() {

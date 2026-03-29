@@ -66,18 +66,18 @@ impl App {
                         AttemptsTableConfig::default();
                     self.status = AppStatus::Idling;
                 }
-                KeyCode::Down => match self.attempt_manager_config.status {
+                KeyCode::Down | KeyCode::Char('j') => match self.attempt_manager_config.status {
                     AttemptManagerStatus::SelectingAttempts => self.next_attempt(),
                     AttemptManagerStatus::SelectingTests => self.next_test(),
                 },
-                KeyCode::Up => match self.attempt_manager_config.status {
+                KeyCode::Up | KeyCode::Char('k') => match self.attempt_manager_config.status {
                     AttemptManagerStatus::SelectingAttempts => self.previous_attempt(),
                     AttemptManagerStatus::SelectingTests => self.previous_test(),
                 },
-                KeyCode::Right => {
+                KeyCode::Right | KeyCode::Char('l') => {
                     self.attempt_manager_config.status = AttemptManagerStatus::SelectingTests
                 }
-                KeyCode::Left => {
+                KeyCode::Left | KeyCode::Char('r') => {
                     self.attempt_manager_config.status = AttemptManagerStatus::SelectingAttempts;
                     self.attempt_manager_config
                         .tests_table_config
