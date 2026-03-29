@@ -1,4 +1,4 @@
-use crate::app::App;
+use crate::app::{App, AttemptsTableConfig};
 use crate::{AppStatus, app::AttemptManagerStatus};
 use crossterm::event::{self, Event, KeyCode};
 use std::io;
@@ -61,7 +61,11 @@ impl App {
     pub fn attempt_manager_handle_events(&mut self) -> io::Result<()> {
         if let Event::Key(key) = event::read()? {
             match key.code {
-                KeyCode::Char('q') => self.status = AppStatus::Idling,
+                KeyCode::Char('q') => {
+                    self.attempt_manager_config.attempts_table_config =
+                        AttemptsTableConfig::default();
+                    self.status = AppStatus::Idling;
+                }
                 KeyCode::Down => match self.attempt_manager_config.status {
                     AttemptManagerStatus::SelectingAttempts => self.next_attempt(),
                     AttemptManagerStatus::SelectingTests => self.next_test(),
