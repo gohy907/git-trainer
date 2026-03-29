@@ -49,6 +49,8 @@ WORKDIR /home/$USERNAME
 
 RUN echo 'export PROMPT_COMMAND="history -a; history -n"' >> /home/$USERNAME/.bashrc
 RUN echo 'export HISTCONTROL=""' >> /home/$USERNAME/.bashrc
+RUN echo 'git-trainer task' >> /home/$USERNAME/.bashrc
+RUN echo 'echo "Пользуйтесь командой git-trainer для получения условия задания и сдачи его на проверку."' >> /home/$USERNAME/.bashrc
 
 RUN mkdir -p /etc/git-trainer
 RUN mkdir -p /etc/git-trainer/tests
