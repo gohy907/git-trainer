@@ -54,7 +54,7 @@ fn main() -> io::Result<()> {
         }
         Commands::Submit => {
             fs::write("/etc/git-trainer/status", "2")?;
-            println!("Попытка отправлена! Вы можете посмотреть оценку в менеджере попыток");
+            println!("Попытка отправлена! Вы можете выйти из задания командой \"exit\" и посмотреть оценку в менеджере попыток");
         }
         Commands::Task => {
             fs::write("/etc/git-trainer/status", "0")?;
