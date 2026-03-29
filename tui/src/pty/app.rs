@@ -40,7 +40,8 @@ impl App {
             match key {
                 KeyCode::Char(c) => {
                     let mut bytes = vec![27];
-                    bytes.extend_from_slice(c.to_string().as_bytes());
+                    let mut buf = [0; 4];
+                    bytes.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
                     bytes
                 }
                 _ => vec![],
@@ -77,15 +78,20 @@ impl App {
                 KeyCode::F(11) => vec![27, 91, 50, 51, 126],
                 KeyCode::F(12) => vec![27, 91, 50, 52, 126],
 
-                KeyCode::Char(c) => vec![c as u8],
+                KeyCode::Char(c) => {
+                    let mut buf = [0; 4];
+                    c.encode_utf8(&mut buf).as_bytes().to_vec()
+                }
 
                 _ => vec![],
             }
         };
 
-        sender
-            .try_send(Bytes::from(bytes_to_send))
-            .map_err(|e| format!("Channel error: {}", e))?;
+        if !bytes_to_send.is_empty() {
+            sender
+                .try_send(Bytes::from(bytes_to_send))
+                .map_err(|e| format!("Channel error: {}", e))?;
+        }
         Ok(())
     }
 }
