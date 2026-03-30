@@ -1,4 +1,4 @@
 default:
     rm -rf tasks/small-but-mighty/src/repo
-    git clone git@github.com:git-trainer-tasks/small-but-mighty tasks/small-but-mighty/src/repo
+    git clone https://github.com/git-trainer-tasks/small-but-mighty.git tasks/small-but-mighty/src/repo
     docker build -f tasks/small-but-mighty/src/Dockerfile -t git-trainer:small-but-mighty .
