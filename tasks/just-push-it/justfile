@@ -9,7 +9,7 @@ default:
     TMP_REMOTE_WORK="$(mktemp -d /tmp/git-trainer_just-push-it-remote.XXXXXX)"
     trap 'rm -rf "$TMP_BASE_REPO" "$TMP_REMOTE_WORK"' EXIT
 
-    git clone git@github.com:git-trainer-tasks/just-push-it "$TMP_BASE_REPO"
+    git clone https://github.com/git-trainer-tasks/just-push-it.git "$TMP_BASE_REPO"
     git clone --bare "$TMP_BASE_REPO" tasks/just-push-it/src/just-push-it-origin.git
     git clone tasks/just-push-it/src/just-push-it-origin.git tasks/just-push-it/src/repo
     git clone tasks/just-push-it/src/just-push-it-origin.git "$TMP_REMOTE_WORK"
