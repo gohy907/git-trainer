@@ -8,7 +8,7 @@ trap 'rm -rf "$TMP_DIR" "$RUN_DIR"' EXIT
 EXPECTED_OUTPUT="Usage: ./coffee-counter <drink>"
 
 if ! cp -R "$REPO_DIR" "$TMP_DIR/repo" 2>/dev/null; then
-    echo "8. Не удалось подготовить временную копию репозитория для проверки."
+    echo "8. Произошла системная ошибка, сообщите о ней преподавателю."
     exit 1
 fi
 
