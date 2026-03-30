@@ -5,7 +5,7 @@ TMP_DIR="$(mktemp -d /tmp/git-trainer.XXXXXX)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 if ! cp -R "$REPO_DIR" "$TMP_DIR/repo" 2>/dev/null; then
-    echo "6. Не удалось подготовить временную копию репозитория для проверки."
+    echo "6. Произошла системная ошибка, сообщите о ней преподавателю."
     exit 1
 fi
 
