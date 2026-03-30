@@ -24,6 +24,7 @@ def normalize_drink_name(drink_name):
 def get_price(drink_name):
     normalized_name = normalize_drink_name(drink_name)
     return MENU[normalized_name]
+
 EOF
 )"
 
@@ -31,6 +32,7 @@ EXPECTED_RECEIPT_CONTENT="$(cat <<'EOF'
 def format_receipt(drink_name, price):
     display_name = drink_name.strip().title()
     return f"Drink: {display_name}\nTotal: {price} RUB\nSee you soon!"
+
 EOF
 )"
 
