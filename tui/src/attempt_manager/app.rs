@@ -77,7 +77,7 @@ impl App {
                 KeyCode::Right | KeyCode::Char('l') => {
                     self.attempt_manager_config.status = AttemptManagerStatus::SelectingTests
                 }
-                KeyCode::Left | KeyCode::Char('r') => {
+                KeyCode::Left | KeyCode::Char('h') => {
                     self.attempt_manager_config.status = AttemptManagerStatus::SelectingAttempts;
                     self.attempt_manager_config
                         .tests_table_config
