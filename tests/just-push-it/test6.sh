@@ -13,8 +13,8 @@ cd "$TMP_DIR/repo" || exit 1
 git reset --hard HEAD &>/dev/null
 git clean -fdx &>/dev/null
 
-if grep -qxF '# Просто запушь это' README.md >/dev/null 2>&1 && \
-   grep -qxF 'Этот репозиторий содержит небольшую консольную программу на C++.' README.md >/dev/null 2>&1; then
+if grep -qxF '# Max Of Two' README.md >/dev/null 2>&1 && \
+   grep -qxF 'Очень полезная программа, находящая максимум из двух чисел.' README.md >/dev/null 2>&1; then
     echo "6. README.md содержит перевод из удалённого репозитория."
     exit 0
 else
