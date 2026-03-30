@@ -9,7 +9,7 @@ EXPECTED_ROOT_MESSAGE="chore: bootstrap just-push-it project"
 EXPECTED_REMOTE_MESSAGE="docs: перевести README на русский язык"
 
 if ! cp -R "$REPO_DIR" "$TMP_DIR/repo" 2>/dev/null; then
-    echo "7. Не удалось подготовить временную копию репозитория для проверки."
+    echo "7. Произошла системная ошибка, сообщите о ней преподавателю."
     exit 1
 fi
 

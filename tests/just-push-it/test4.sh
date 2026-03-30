@@ -7,7 +7,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 EXPECTED_OUTPUT=$'max(7, 3) = 7\nmax(-4, 2) = 2'
 
 if ! cp -R "$REPO_DIR" "$TMP_DIR/repo" 2>/dev/null; then
-    echo "4. Не удалось подготовить временную копию репозитория для проверки."
+    echo "4. Произошла системная ошибка, сообщите о ней преподавателю."
     exit 1
 fi
 
@@ -15,8 +15,8 @@ cd "$TMP_DIR/repo" || exit 1
 git reset --hard HEAD &>/dev/null
 git clean -fdx &>/dev/null
 
-if ! g++ -std=c++17 -Wall -Wextra -pedantic main.cpp -o just-push-it &>/dev/null; then
-    echo "4. Не удалось собрать программу для проверки результата."
+if ! g++ main.cpp -o just-push-it &>/dev/null; then
+    echo "4. Не удалось скомпилировать программу для проверки результата."
     exit 1
 fi
 
