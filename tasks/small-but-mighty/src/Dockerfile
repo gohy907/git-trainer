@@ -18,28 +18,6 @@ RUN git config --global --add safe.directory /home/$USERNAME/coffee-counter
 RUN git config --global user.name "$GIT_USERNAME" && \
     git config --global user.email "$GIT_EMAIL" && \
     git config --global --add safe.directory /home/$USERNAME
-RUN cd coffee-counter && git switch feature && \
-    printf '%s\n' \
-    'MENU = {' \
-    '    "espresso": 150,' \
-    '    "latte": 220,' \
-    '    "tea": 110,' \
-    '}' \
-    '' \
-    'ALIASES = {' \
-    '    "expresso": "espresso",' \
-    '}' \
-    '' \
-    '' \
-    'def normalize_drink_name(drink_name):' \
-    '    normalized_name = drink_name.strip().lower()' \
-    '    return ALIASES.get(normalized_name, normalized_name)' \
-    '' \
-    '' \
-    'def get_price(drink_name):' \
-    '    normalized_name = normalize_drink_name(drink_name)' \
-    '    return MENU[normalized_name]' > menu.py && \
-    printf '%s\n' \
-    'def format_receipt(drink_name, price):' \
-    '    display_name = drink_name.strip().title()' \
-    '    return f"Drink: {display_name}\nTotal: {price} RUB\nSee you soon!"' > receipt.py
+RUN cd coffee-counter && git switch feature
+COPY tasks/small-but-mighty/src/menu.py coffee-counter/menu.py
+COPY tasks/small-but-mighty/src/receipt.py coffee-counter/receipt.py
