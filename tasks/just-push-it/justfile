@@ -14,25 +14,7 @@ default:
     git clone tasks/just-push-it/src/just-push-it-origin.git tasks/just-push-it/src/repo
     git clone tasks/just-push-it/src/just-push-it-origin.git "$TMP_REMOTE_WORK"
 
-    cat > "$TMP_REMOTE_WORK/README.md" <<'EOF'
-    # Просто запушь это
-
-    Этот репозиторий содержит небольшую консольную программу на C++.
-
-    Ваша задача - реализовать функцию `max_of_two` в файле `main.cpp`, сделать коммит и отправить изменения в удалённый репозиторий.
-
-    ## Сборка
-
-    ```sh
-    g++ -std=c++17 -Wall -Wextra -pedantic main.cpp -o just-push-it
-    ```
-
-    ## Запуск
-
-    ```sh
-    ./just-push-it
-    ```
-    EOF
+    cp tasks/just-push-it/src/README.md "$TMP_REMOTE_WORK/README.md"
 
     (
         cd "$TMP_REMOTE_WORK"
