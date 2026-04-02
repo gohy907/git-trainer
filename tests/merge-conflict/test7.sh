@@ -5,7 +5,7 @@ sudo cp -r "$HOME/binary-addition" "$NEW_DIR"
 git config --global --add safe.directory "$NEW_DIR"
 cd "$NEW_DIR" 
 
-g++ main.cpp -o main
+sudo g++ main.cpp -o main
 
 if [ "$?" -eq 0 ]; then
     echo "7. Программа компилируется."
