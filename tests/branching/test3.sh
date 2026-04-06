@@ -5,7 +5,7 @@ sudo cp -r "$HOME/counting-sort" "$NEW_DIR"
 git config --global --add safe.directory "$NEW_DIR"
 cd "$NEW_DIR" 
 
-sudo git switch print_vector &>/dev/null
+sudo git rev-parse --verify print_vector &>/dev/null
 
 if [ "$?" -eq 0 ]; then
     sudo rm -rf "$NEW_DIR"
