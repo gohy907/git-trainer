@@ -1,0 +1,23 @@
+name: Build images
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: extractions/setup-just@v4
+      with:
+        just-version: '1.46.0'
+    - name: Build images
+      run: just build-images
