@@ -28,6 +28,9 @@ if [ "$ACTUAL_COMMIT_COUNT" = "$EXPECTED_COMMIT_COUNT" ] && \
    [ "$ROOT_MESSAGE" = "$EXPECTED_ROOT_MESSAGE" ]; then
     echo "7. История линейная: сначала базовый коммит, затем удалённый коммит, затем ваш коммит."
     exit 0
+elif [ "$ACTUAL_COMMIT_COUNT" != "$EXPECTED_COMMIT_COUNT" ]; then
+    echo "7. Убедитесь, что вы сделали ровно один коммит."
+    exit 1
 else
     echo "7. Убедитесь, что вы подтянули удалённый коммит через rebase и не создали merge-коммит."
     exit 1
